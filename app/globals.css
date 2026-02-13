@@ -1,0 +1,131 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+@layer base {
+  :root {
+    /* NeuroGrid Hacker Matrix Theme - always dark */
+    --background: 120 100% 1%;
+    --foreground: 120 100% 50%;
+    --card: 120 30% 4%;
+    --card-foreground: 120 100% 50%;
+    --popover: 120 30% 4%;
+    --popover-foreground: 120 100% 50%;
+    --primary: 120 100% 50%;
+    --primary-foreground: 120 100% 1%;
+    --secondary: 120 20% 8%;
+    --secondary-foreground: 120 100% 50%;
+    --muted: 120 15% 10%;
+    --muted-foreground: 120 40% 35%;
+    --accent: 120 100% 50%;
+    --accent-foreground: 120 100% 1%;
+    --destructive: 0 80% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 120 40% 12%;
+    --input: 120 30% 10%;
+    --ring: 120 100% 50%;
+    --chart-1: 120 100% 50%;
+    --chart-2: 120 80% 40%;
+    --chart-3: 120 60% 30%;
+    --chart-4: 160 80% 45%;
+    --chart-5: 80 80% 45%;
+    --radius: 0.25rem;
+    --sidebar-background: 120 30% 3%;
+    --sidebar-foreground: 120 100% 50%;
+    --sidebar-primary: 120 100% 50%;
+    --sidebar-primary-foreground: 120 100% 1%;
+    --sidebar-accent: 120 20% 8%;
+    --sidebar-accent-foreground: 120 100% 50%;
+    --sidebar-border: 120 40% 12%;
+    --sidebar-ring: 120 100% 50%;
+    /* Custom tokens */
+    --matrix-green: #00FF41;
+    --matrix-green-dim: #00cc33;
+    --asset-blue: #00FFFF;
+    --asset-blue-dim: #00cccc;
+    --matrix-dark: #050505;
+    --terminal-bg: #0a0f0a;
+    --scanline-opacity: 0.03;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Matrix scanline effect */
+@keyframes scanline {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100vh); }
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+@keyframes glitch {
+  0%, 100% { transform: translate(0); }
+  20% { transform: translate(-2px, 2px); }
+  40% { transform: translate(2px, -2px); }
+  60% { transform: translate(-1px, -1px); }
+  80% { transform: translate(1px, 1px); }
+}
+
+@keyframes hexRotate {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 5px var(--matrix-green), 0 0 10px rgba(0, 255, 65, 0.3); }
+  50% { box-shadow: 0 0 15px var(--matrix-green), 0 0 30px rgba(0, 255, 65, 0.5); }
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes typewriter {
+  from { width: 0; }
+  to { width: 100%; }
+}
+
+@keyframes matrixRain {
+  0% { transform: translateY(-100%); opacity: 1; }
+  80% { opacity: 1; }
+  100% { transform: translateY(100vh); opacity: 0; }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--matrix-dark);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 255, 65, 0.3);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 255, 65, 0.5);
+}
+
+/* Selection color */
+::selection {
+  background: rgba(0, 255, 65, 0.3);
+  color: var(--matrix-green);
+}
