@@ -3,6 +3,11 @@
 import { useRef, useEffect } from "react"
 import { useTreasuryData } from "@/components/modules/treasury-api"
 import type { TreasuryAsset } from "@/lib/treasury-api"
+import { PRODUCTION_TREASURY } from "@/lib/treasury-api"
+
+const ACTIVE_VAULT_SOL = typeof process !== "undefined" && process.env.NEXT_PUBLIC_TREASURY_SOL
+  ? process.env.NEXT_PUBLIC_TREASURY_SOL
+  : PRODUCTION_TREASURY.sol
 
 const ASSET_COLORS: Record<string, string> = {
   BTC: "#F7931A",
@@ -30,7 +35,14 @@ function AllocationChart({ assets }: { assets: TreasuryAsset[] }) {
     const h = rect.height
 
     const total = assets.reduce((s, a) => s + a.usdValue, 0)
-    if (total <= 0) return
+    if (total <= 0) {
+      ctx.font = "14px monospace"
+      ctx.fillStyle = "rgba(0,255,65,0.4)"
+      ctx.textAlign = "center"
+      ctx.textBaseline = "middle"
+      ctx.fillText("Epoch 0", w / 2, h / 2)
+      return
+    }
 
     let start = -0.5 * Math.PI
     const cx = w / 2
@@ -91,7 +103,7 @@ export function TreasuryViz() {
             Status: Epoch 0 (Genesis Bootstrapping)
           </div>
           <div className="font-mono text-[10px] break-all" style={{ color: "rgba(0,255,65,0.5)" }}>
-            Active Vault: AmKdMDFTYRXUHPxcXjvJxMM1xZeAmR6rmeNj2t2cWH3h
+            Active Vault: {ACTIVE_VAULT_SOL}
           </div>
           <div className="text-xs" style={{ color: "rgba(255,200,0,0.9)" }}>
             [Listening] Awaiting first node deployment to route 5% protocol fees.
@@ -105,7 +117,7 @@ export function TreasuryViz() {
             Status: Epoch 0 (Genesis Bootstrapping)
           </div>
           <div className="font-mono text-[10px] break-all" style={{ color: "rgba(0,255,65,0.5)" }}>
-            Active Vault: AmKdMDFTYRXUHPxcXjvJxMM1xZeAmR6rmeNj2t2cWH3h
+            Active Vault: {ACTIVE_VAULT_SOL}
           </div>
           <div className="text-xs" style={{ color: "rgba(255,200,0,0.9)" }}>
             [Listening] Awaiting first node deployment to route 5% protocol fees.

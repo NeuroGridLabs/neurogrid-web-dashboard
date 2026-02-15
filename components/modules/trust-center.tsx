@@ -4,6 +4,7 @@ import { useState } from "react"
 import { Shield, ExternalLink, Activity, Copy } from "lucide-react"
 import { TerminalLog } from "@/components/atoms/terminal-log"
 import { useTreasuryData } from "@/components/modules/treasury-api"
+import { PRODUCTION_TREASURY } from "@/lib/treasury-api"
 
 const NARRATIVE =
   "NeuroGrid Epoch Treasury. 100% of protocol fees are routed to the Solana Multi-sig for continuous $NRG buybacks. Hard-asset reserve rebalance is triggered automatically every $10,000 USDT accumulated."
@@ -60,11 +61,23 @@ type VaultItem = {
   balanceDisplay: string | null
 }
 
-const VAULTS: VaultItem[] = [
+/** Vault addresses: single source of truth with lib/treasury-api (env overrides for NEXT_PUBLIC_TREASURY_*) */
+function getVaultAddresses(): { sol: string; btc: string; eth: string; sui: string } {
+  return {
+    sol: process.env.NEXT_PUBLIC_TREASURY_SOL ?? PRODUCTION_TREASURY.sol,
+    btc: process.env.NEXT_PUBLIC_TREASURY_BTC ?? PRODUCTION_TREASURY.btc,
+    eth: process.env.NEXT_PUBLIC_TREASURY_ETH ?? PRODUCTION_TREASURY.eth,
+    sui: process.env.NEXT_PUBLIC_TREASURY_SUI ?? PRODUCTION_TREASURY.sui,
+  }
+}
+
+function buildVaults(): VaultItem[] {
+  const addr = getVaultAddresses()
+  return [
   {
     chain: "SOL",
     label: "ACTIVE PROTOCOL VAULT",
-    address: "AmKdMDFTYRXUHPxcXjvJxMM1xZeAmR6rmeNj2t2cWH3h",
+    address: addr.sol,
     description: "Primary Protocol Vault (Receives 100% of 5% fees for $NRG Buybacks)",
     status: "🟢 ACTIVE: Accumulating Epoch 1 Fees",
     statusType: "active" as const,
@@ -73,7 +86,7 @@ const VAULTS: VaultItem[] = [
   {
     chain: "BTC",
     label: "HARD ASSET RESERVE",
-    address: "bc1q206f5r0e7lnuzy8kexnjjdhs3wg3ec5zth0kke",
+    address: addr.btc,
     description: "Physical Gold of Web3. 45% Target Ratio.",
     status: "⏳ AWAITING: Epoch 1 Rebalance ($10k TVL)",
     statusType: "awaiting" as const,
@@ -82,7 +95,7 @@ const VAULTS: VaultItem[] = [
   {
     chain: "ETH",
     label: "SMART CONTRACT RESERVE",
-    address: "0x661613537AbD68166714B68D87F6BF92262e464E",
+    address: addr.eth,
     description: "EVM Ecosystem Liquidity. Target Ratio.",
     status: "⏳ AWAITING: Epoch 1 Rebalance ($10k TVL)",
     statusType: "awaiting" as const,
@@ -91,13 +104,16 @@ const VAULTS: VaultItem[] = [
   {
     chain: "SUI",
     label: "EMERGING ECO RESERVE",
-    address: "0xa29dd7936ef96a44c859b4c3b3d46a1ee97019cb1f7dd7f23fb3d4d5c1e109b4",
+    address: addr.sui,
     description: "High-Performance Compute Reserve. Target Ratio.",
     status: "⏳ AWAITING: Epoch 1 Rebalance ($10k TVL)",
     statusType: "awaiting" as const,
     balanceDisplay: "$0.00",
   },
-]
+  ]
+}
+
+const VAULTS: VaultItem[] = buildVaults()
 
 function LiveFlowSection() {
   const { data: treasury, loading, error } = useTreasuryData()

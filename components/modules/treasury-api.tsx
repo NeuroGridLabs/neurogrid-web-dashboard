@@ -11,9 +11,9 @@ export function useTreasuryData() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (forceRefresh = false) => {
     const now = Date.now()
-    if (clientCache && now - clientCache.ts < CACHE_TTL) {
+    if (!forceRefresh && clientCache && now - clientCache.ts < CACHE_TTL) {
       setData(clientCache.data)
       setLoading(false)
       return
@@ -21,7 +21,8 @@ export function useTreasuryData() {
     try {
       setLoading(true)
       setError(null)
-      const r = await fetch("/api/treasury")
+      const url = forceRefresh ? "/api/treasury?refresh=1" : "/api/treasury"
+      const r = await fetch(url)
       if (!r.ok) throw new Error("Treasury fetch failed")
       const d: TreasuryData = await r.json()
       clientCache = { data: d, ts: now }

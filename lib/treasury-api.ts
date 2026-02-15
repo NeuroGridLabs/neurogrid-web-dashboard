@@ -161,8 +161,8 @@ async function fetchUsdPrices(): Promise<Record<string, number>> {
   return { btc, eth, sol, sui, nrg: 0.125 }
 }
 
-// Production addresses — Epoch-based $10k rebalance (Trust Center aligned)
-const PRODUCTION_TREASURY = {
+// Production addresses — Epoch-based $10k rebalance (Trust Center aligned). Export for client single source of truth.
+export const PRODUCTION_TREASURY = {
   sol: "AmKdMDFTYRXUHPxcXjvJxMM1xZeAmR6rmeNj2t2cWH3h",
   btc: "bc1q206f5r0e7lnuzy8kexnjjdhs3wg3ec5zth0kke",
   eth: "0x661613537AbD68166714B68D87F6BF92262e464E",
@@ -198,9 +198,9 @@ function getEpochZeroTreasuryData(now: number): TreasuryData {
   }
 }
 
-export async function fetchTreasuryData(): Promise<TreasuryData> {
+export async function fetchTreasuryData(skipCache = false): Promise<TreasuryData> {
   const now = Date.now()
-  if (cache && now - cache.ts < CACHE_TTL_MS) return cache.data
+  if (!skipCache && cache && now - cache.ts < CACHE_TTL_MS) return cache.data
 
   const addresses = getTreasuryAddresses()
 

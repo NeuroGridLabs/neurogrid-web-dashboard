@@ -39,6 +39,7 @@ function ConnectionDetailsModal({
   }
 
   const handleDownloadPem = () => {
+    // Placeholder only: no real key is ever embedded. Backend must supply real key via secure channel.
     const blob = new Blob([`-----BEGIN PRIVATE KEY-----\n(placeholder-key)\n-----END PRIVATE KEY-----`], {
       type: "application/x-pem-file",
     })
