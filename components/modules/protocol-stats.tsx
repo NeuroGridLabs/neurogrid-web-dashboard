@@ -90,7 +90,7 @@ export function ProtocolStats() {
       <div className="mx-auto max-w-7xl">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-sm font-bold uppercase tracking-wider" style={{ color: "#00FF41" }}>
-            Protocol Stats (v3.4 Genesis)
+            Protocol Stats (v3.5 Genesis)
           </h2>
           <a href="https://pump.fun" target="_blank" rel="noopener noreferrer">
             <NeonButton variant="primary" accentColor="#00FF41">
@@ -148,7 +148,7 @@ export function ProtocolStats() {
             <AssetDonutChart />
             <div className="flex flex-col gap-1">
               <span className="text-xs font-bold uppercase tracking-wider" style={{ color: "#00FF41" }}>
-                Target Asset Allocation (v3.4)
+                Target Asset Allocation (v3.5)
               </span>
               <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-xs" style={{ color: "rgba(0,255,65,0.6)" }}>
                 <span>BTC 45%</span>

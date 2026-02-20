@@ -1,4 +1,4 @@
-﻿# Dependencies & build
+# Dependencies & build
 node_modules/
 .next/
 out/
@@ -50,7 +50,8 @@ mnemonic*.txt
 # Vercel
 .vercel
 
-# v0 runtime (preview only)
+# IDE workspace & generated runtime artifacts (do not commit)
+v0-project.code-workspace
 __v0_runtime_loader.js
 __v0_devtools.tsx
 __v0_jsx-dev-runtime.ts

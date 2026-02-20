@@ -4,9 +4,8 @@ import { Geist_Mono, Inter } from 'next/font/google'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { ThemeProvider } from '@/components/theme-provider'
 import { Toaster } from '@/components/ui/sonner'
-import { SolanaProviders } from '@/lib/solana-providers'
-import { WalletProvider } from '@/lib/wallet-context'
-import { MinerRegistryProvider } from '@/lib/miner-registry-context'
+import { SolanaProviders } from '@/lib/providers'
+import { WalletProvider, AuthProvider, RoleProvider, MinerRegistryProvider } from '@/lib/contexts'
 import './globals.css'
 
 const geistMono = Geist_Mono({
@@ -22,7 +21,7 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: 'NeuroGrid Protocol | The Liquidity Layer for AI Compute',
   description:
-    'Decentralized GPU computing exchange powered by FRP tunneling and Proof-of-Inference. Community-driven, anti-VC, fair launch.',
+    'Decentralized GPU computing exchange powered by NeuroGrid proprietary tunnel protocol and Proof-of-Inference. Community-driven, anti-VC, fair launch.',
   keywords: ['GPU', 'decentralized', 'computing', 'AI', 'blockchain', 'PoI', 'RTX4090'],
   icons: {
     icon: '/images/neurogrid-logo.png',
@@ -46,12 +45,16 @@ export default function RootLayout({
         <ThemeProvider attribute="class" defaultTheme="dark">
           <SolanaProviders>
             <WalletProvider>
-              <MinerRegistryProvider>
-                <TooltipProvider delayDuration={200}>
-                  {children}
-                  <Toaster richColors position="top-center" />
-                </TooltipProvider>
-              </MinerRegistryProvider>
+              <AuthProvider>
+                <RoleProvider>
+                <MinerRegistryProvider>
+                  <TooltipProvider delayDuration={200}>
+                    {children}
+                    <Toaster richColors position="top-center" />
+                  </TooltipProvider>
+                </MinerRegistryProvider>
+              </RoleProvider>
+              </AuthProvider>
             </WalletProvider>
           </SolanaProviders>
         </ThemeProvider>

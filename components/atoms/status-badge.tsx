@@ -1,4 +1,15 @@
-export type BadgeStatus = "ACTIVE" | "SYNCING" | "OFFLINE" | "VERIFIED" | "PENDING" | "STANDBY"
+export type BadgeStatus =
+  | "ACTIVE"
+  | "SYNCING"
+  | "OFFLINE"
+  | "VERIFIED"
+  | "PENDING"
+  | "STANDBY"
+  | "ONLINE_IDLE"
+  | "OCCUPIED"
+  | "LOCKED"
+  | "OFFLINE_VIOLATION"
+  | "VIOLATED"
 
 const STATUS_STYLES: Record<BadgeStatus, { bg: string; text: string; dot: string }> = {
   ACTIVE: { bg: "rgba(0,255,65,0.1)", text: "#00FF41", dot: "#00FF41" },
@@ -7,6 +18,11 @@ const STATUS_STYLES: Record<BadgeStatus, { bg: string; text: string; dot: string
   PENDING: { bg: "rgba(255,200,0,0.1)", text: "#ffc800", dot: "#ffc800" },
   OFFLINE: { bg: "rgba(255,68,68,0.1)", text: "#ff4444", dot: "#ff4444" },
   STANDBY: { bg: "rgba(0,255,255,0.08)", text: "#00FFFF", dot: "#00FFFF" },
+  ONLINE_IDLE: { bg: "rgba(0,255,65,0.08)", text: "#00FF41", dot: "#00FF41" },
+  OCCUPIED: { bg: "rgba(255,165,0,0.12)", text: "#ffa500", dot: "#ffa500" },
+  LOCKED: { bg: "rgba(255,165,0,0.15)", text: "#ffa500", dot: "#ffa500" },
+  OFFLINE_VIOLATION: { bg: "rgba(255,68,68,0.15)", text: "#ff4444", dot: "#ff4444" },
+  VIOLATED: { bg: "rgba(255,68,68,0.2)", text: "#ff4444", dot: "#ff4444" },
 }
 
 interface StatusBadgeProps {

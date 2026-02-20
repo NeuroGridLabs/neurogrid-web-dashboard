@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { KeyRound, Download, Copy } from "lucide-react"
+import { useState, useEffect } from "react"
+import { KeyRound, Download, Copy, AlertTriangle } from "lucide-react"
 import { GpuBar } from "@/components/atoms/gpu-bar"
 import {
   Dialog,
@@ -10,6 +10,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import type { RentedNodeSnapshot } from "@/components/modules/node-cluster"
+
+/** Placeholder session key for legacy snapshots that don't have session_key (do not expose raw gateway/port). */
+function fallbackSessionKey(nodeId: string): string {
+  const slug = nodeId.replace(/-/g, "").slice(0, 12)
+  const pad = "0".repeat(12)
+  return `ng_sess_${(slug + pad).slice(0, 24)}`
+}
 
 function ConnectionDetailsModal({
   node,
@@ -22,15 +29,13 @@ function ConnectionDetailsModal({
   open: boolean
   onOpenChange: (open: boolean) => void
 }) {
-  const tenantUser = walletAddress
-    ? `tenant-${walletAddress.slice(0, 2).toUpperCase()}${walletAddress.slice(2, 6)}`
-    : "tenant-0x742D"
-  const sshCommand = `ssh -i neurogrid-${node.id}.pem ${tenantUser}@${node.gateway} -p ${node.port}`
+  const sessionKey = node.session_key ?? fallbackSessionKey(node.id)
   const [copied, setCopied] = useState(false)
+  const [clientDownloaded, setClientDownloaded] = useState(false)
 
-  const handleCopyCommand = async () => {
+  const handleCopySessionKey = async () => {
     try {
-      await navigator.clipboard.writeText(sshCommand)
+      await navigator.clipboard.writeText(sessionKey)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch {
@@ -38,15 +43,16 @@ function ConnectionDetailsModal({
     }
   }
 
-  const handleDownloadPem = () => {
-    // Placeholder only: no real key is ever embedded. Backend must supply real key via secure channel.
-    const blob = new Blob([`-----BEGIN PRIVATE KEY-----\n(placeholder-key)\n-----END PRIVATE KEY-----`], {
-      type: "application/x-pem-file",
-    })
+  const handleDownloadClient = () => {
+    setClientDownloaded(true)
+    const blob = new Blob(
+      ["# NeuroClient placeholder\n# Replace with real Mac/Win installer when built.\n# Secure tunnel client — no raw IP/port exposure.\n"],
+      { type: "text/plain" }
+    )
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
     a.href = url
-    a.download = `neurogrid-${node.id}.pem`
+    a.download = "NeuroClient-README.txt"
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -62,53 +68,61 @@ function ConnectionDetailsModal({
       >
         <DialogHeader>
           <DialogTitle className="text-sm font-bold uppercase tracking-wider" style={{ color: "#00FF41" }}>
-            Connection Details — {node.name}
+            Secure Access — {node.name}
           </DialogTitle>
         </DialogHeader>
-        <div className="space-y-3 text-xs">
-          <div className="space-y-1">
-            <span style={{ color: "rgba(0,255,65,0.5)" }}>Host:</span>
-            <p className="font-mono" style={{ color: "#00FF41" }}>{node.gateway}</p>
-          </div>
-          <div className="space-y-1">
-            <span style={{ color: "rgba(0,255,65,0.5)" }}>Port:</span>
-            <p className="font-mono" style={{ color: "#00FF41" }}>{node.port}</p>
-          </div>
-          <div className="space-y-1">
-            <span style={{ color: "rgba(0,255,65,0.5)" }}>User:</span>
-            <p className="font-mono" style={{ color: "#00FF41" }}>{tenantUser}</p>
-          </div>
+        <div className="space-y-4 text-xs">
+          {/* Step 1: Get the Client */}
           <div className="space-y-2">
-            <span style={{ color: "rgba(0,255,65,0.5)" }}>SSH Key:</span>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={handleDownloadPem}
-                className="inline-flex items-center gap-1.5 border px-3 py-1.5 text-xs font-medium transition-colors hover:opacity-90"
-                style={{ borderColor: "#00FF41", color: "#00FF41" }}
-              >
-                <KeyRound className="h-3.5 w-3.5" />
-                Download SSH Key
-              </button>
-              <button
-                type="button"
-                onClick={handleCopyCommand}
-                className="inline-flex items-center gap-1.5 border px-3 py-1.5 text-xs font-medium transition-colors hover:opacity-90"
-                style={{ borderColor: "#00FF41", color: "#00FF41" }}
-              >
-                <Copy className="h-3.5 w-3.5" />
-                {copied ? "Copied" : "Copy Command"}
-              </button>
-            </div>
-            <p
-              className="break-all font-mono text-[10px]"
-              style={{ color: "rgba(0,255,65,0.5)" }}
+            <span className="text-[10px] uppercase tracking-wider" style={{ color: "rgba(0,255,65,0.6)" }}>
+              Step 1 — Get the Client
+            </span>
+            <button
+              type="button"
+              onClick={handleDownloadClient}
+              className="inline-flex w-full items-center justify-center gap-2 border px-4 py-3 text-sm font-medium transition-colors hover:opacity-90"
+              style={{
+                borderColor: clientDownloaded ? "rgba(0,255,65,0.4)" : "#00FF41",
+                color: "#00FF41",
+                backgroundColor: clientDownloaded ? "rgba(0,255,65,0.06)" : "rgba(0,255,65,0.08)",
+              }}
             >
-              {sshCommand}
+              <Download className="h-4 w-4 shrink-0" />
+              {clientDownloaded ? "NeuroClient (Mac/Win) — downloaded" : "Download NeuroClient (Mac/Win)"}
+            </button>
+          </div>
+
+          {/* Step 2: Connection Key */}
+          <div className="space-y-2">
+            <span className="text-[10px] uppercase tracking-wider" style={{ color: "rgba(0,255,65,0.6)" }}>
+              Step 2 — Connection Key
+            </span>
+            <div
+              className="rounded border p-3 font-mono text-[11px] tracking-tight"
+              style={{
+                borderColor: "rgba(0,255,65,0.25)",
+                backgroundColor: "rgba(0,0,0,0.4)",
+                color: "rgba(0,255,65,0.9)",
+              }}
+            >
+              {sessionKey}
+            </div>
+            <button
+              type="button"
+              onClick={handleCopySessionKey}
+              className="inline-flex w-full items-center justify-center gap-2 border px-4 py-2.5 text-sm font-bold uppercase tracking-wider transition-colors hover:opacity-90"
+              style={{ borderColor: "#00FF41", color: "#00FF41", backgroundColor: "rgba(0,255,65,0.12)" }}
+            >
+              <Copy className="h-4 w-4 shrink-0" />
+              {copied ? "Copied" : "Copy Session Key"}
+            </button>
+            <p className="text-[10px] leading-relaxed" style={{ color: "rgba(0,255,65,0.65)" }}>
+              Paste this key into your NeuroClient to establish a secure, encrypted tunnel to your GPU. No raw IP or port is exposed.
             </p>
           </div>
+
           <div
-            className="mt-3 space-y-1.5 rounded border p-3 text-[10px]"
+            className="space-y-1.5 rounded border p-3 text-[10px]"
             style={{
               borderColor: "rgba(0,255,65,0.2)",
               backgroundColor: "rgba(0,255,65,0.04)",
@@ -120,8 +134,8 @@ function ConnectionDetailsModal({
             </p>
             <ul className="list-inside list-disc space-y-0.5">
               <li><strong>Small Scripts:</strong> Use VS Code Remote / SFTP (Speed limited).</li>
-              <li><strong>Public Models:</strong> Run <code className="font-mono">wget --limit-rate=20m [URL]</code> directly inside the node terminal.</li>
-              <li><strong>Large Private Data:</strong> Use P2P <code className="font-mono">croc</code> to bypass relay bottlenecks. DO NOT upload &gt;1GB via SFTP.</li>
+              <li><strong>Public Models:</strong> Run <code className="font-mono">wget --limit-rate=20m [URL]</code> inside the node.</li>
+              <li><strong>Large Private Data:</strong> Use P2P <code className="font-mono">croc</code>. DO NOT upload &gt;1GB via SFTP.</li>
             </ul>
           </div>
         </div>
@@ -134,6 +148,7 @@ interface RentedNodesPanelProps {
   walletAddress?: string | null
   rentedNodes: RentedNodeSnapshot[]
   onUndeploy?: (nodeId: string) => void
+  onRedeploy?: (nodeId: string) => void
 }
 
 const ROW_GAP = 6
@@ -142,8 +157,29 @@ const CARD_PADDING_BOTTOM = 6
 /** One row = 2 cards; fixed height so container never grows, scroll for more */
 const SINGLE_ROW_HEIGHT_PX = 106
 
-export function RentedNodesPanel({ walletAddress, rentedNodes, onUndeploy }: RentedNodesPanelProps) {
+const RENEWAL_WARNING_MINUTES = 30
+
+function formatCountdown(expiresAtIso: string): { text: string; remainingMs: number } {
+  const remainingMs = new Date(expiresAtIso).getTime() - Date.now()
+  if (remainingMs <= 0) return { text: "0:00", remainingMs: 0 }
+  const totalSec = Math.floor(remainingMs / 1000)
+  const m = Math.floor(totalSec / 60)
+  const s = totalSec % 60
+  const h = Math.floor(m / 60)
+  const mins = m % 60
+  const text = h > 0 ? `${h}:${String(mins).padStart(2, "0")}:${String(s).padStart(2, "0")}` : `${m}:${String(s).padStart(2, "0")}`
+  return { text, remainingMs }
+}
+
+export function RentedNodesPanel({ walletAddress, rentedNodes, onUndeploy, onRedeploy }: RentedNodesPanelProps) {
   const [credentialNode, setCredentialNode] = useState<RentedNodeSnapshot | null>(null)
+  const [tick, setTick] = useState(0)
+  useEffect(() => {
+    const hasDisconnected = rentedNodes.some((n) => n.disconnected && n.expires_at)
+    if (!hasDisconnected) return
+    const id = setInterval(() => setTick((t) => t + 1), 1000)
+    return () => clearInterval(id)
+  }, [rentedNodes])
 
   return (
     <>
@@ -194,74 +230,110 @@ export function RentedNodesPanel({ walletAddress, rentedNodes, onUndeploy }: Ren
                   <span className="truncate text-xs font-bold" style={{ color: "#00FF41" }}>
                     {node.name}
                   </span>
-                  <div className="flex items-center gap-1 overflow-hidden">
-                    <span
-                      className="min-w-0 truncate text-[10px]"
-                      style={{ color: "rgba(0,255,65,0.6)" }}
-                      title={`${node.gateway}:${node.port}`}
-                    >
-                      {node.gateway}:{node.port}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setCredentialNode(node)}
-                      className="shrink-0 p-0.5 transition-opacity hover:opacity-80"
-                      style={{ color: "#00FF41" }}
-                      aria-label="Connection details"
-                    >
-                      <KeyRound className="h-3 w-3" />
-                    </button>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[10px]" style={{ color: "rgba(0,255,65,0.5)" }}>
-                      {node.gpus} {node.vram}
-                    </span>
-                    <div className="w-14 shrink-0">
-                      <GpuBar value={node.utilization} color="#00FF41" hideLabel />
+                  {node.disconnected && node.expires_at ? (
+                    <div className="flex min-w-0 flex-col gap-0.5">
+                      <span className="text-[10px] font-medium" style={{ color: "rgba(255,200,0,0.95)" }} title={node.expires_at}>
+                        Reclaim in {formatCountdown(node.expires_at).text}
+                      </span>
+                      <span className="text-[9px]" style={{ color: "rgba(0,255,255,0.6)" }}>
+                        {new Date(node.expires_at).toLocaleString("en-US", { dateStyle: "short", timeStyle: "short" })} reclaim
+                      </span>
+                      {formatCountdown(node.expires_at).remainingMs > 0 && formatCountdown(node.expires_at).remainingMs < RENEWAL_WARNING_MINUTES * 60 * 1000 && (
+                        <span className="inline-flex items-center gap-1 text-[9px] font-medium" style={{ color: "#ff9800" }}>
+                          <AlertTriangle className="h-3 w-3 shrink-0" />
+                          Renew within 30 min or the instance will be reclaimed
+                        </span>
+                      )}
                     </div>
-                    <span className="text-[10px] font-medium" style={{ color: "#00FF41" }}>
-                      {node.utilization}%
-                    </span>
-                  </div>
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-1 overflow-hidden">
+                        <button
+                          type="button"
+                          onClick={() => setCredentialNode(node)}
+                          className="inline-flex items-center gap-1 border px-1.5 py-0.5 text-[10px] transition-opacity hover:opacity-90"
+                          style={{ borderColor: "rgba(0,255,65,0.4)", color: "#00FF41" }}
+                          aria-label="Secure access — Session Key & NeuroClient"
+                        >
+                          <KeyRound className="h-3 w-3 shrink-0" />
+                          Access
+                        </button>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px]" style={{ color: "rgba(0,255,65,0.5)" }}>
+                          {node.gpus} {node.vram}
+                        </span>
+                        <div className="w-14 shrink-0">
+                          <GpuBar value={node.utilization} color="#00FF41" hideLabel />
+                        </div>
+                        <span className="text-[10px] font-medium" style={{ color: "#00FF41" }}>
+                          {node.utilization}%
+                        </span>
+                      </div>
+                    </>
+                  )}
                 </div>
-                {/* Right column: ACTIVE + Undeploy, dots aligned (fixed dot column), ACTIVE can have more right space */}
+                {/* Right column: ACTIVE + Undeploy / Redeploy */}
                 <div className="flex min-w-[72px] flex-col items-stretch gap-0.5">
                   <span
                     className="inline-flex items-center rounded border px-2 py-0.5 text-xs"
                     style={{
-                      backgroundColor: "rgba(0,255,65,0.1)",
-                      color: "#00FF41",
-                      borderColor: "rgba(0,255,65,0.35)",
+                      backgroundColor: node.disconnected ? "rgba(0,255,255,0.08)" : "rgba(0,255,65,0.1)",
+                      color: node.disconnected ? "#00FFFF" : "#00FF41",
+                      borderColor: node.disconnected ? "rgba(0,255,255,0.35)" : "rgba(0,255,65,0.35)",
                     }}
                   >
                     <span className="flex w-4 shrink-0 justify-center">
                       <span
                         className="h-1.5 w-1.5 rounded-full"
-                        style={{ backgroundColor: "#00FF41", boxShadow: "0 0 4px #00FF41" }}
+                        style={{ backgroundColor: node.disconnected ? "#00FFFF" : "#00FF41", boxShadow: node.disconnected ? "0 0 4px #00FFFF" : "0 0 4px #00FF41" }}
                       />
                     </span>
-                    {node.status}
+                    {node.disconnected ? "Disconnected" : node.status}
                   </span>
-                  <button
-                    type="button"
-                    onClick={() => onUndeploy?.(node.id)}
-                    className="inline-flex items-center rounded border px-2 py-0.5 text-xs transition-opacity hover:opacity-90"
-                    style={{
-                      backgroundColor: "rgba(255,68,68,0.1)",
-                      color: "#ff4444",
-                      borderColor: "rgba(255,68,68,0.35)",
-                    }}
-                    aria-label="Undeploy"
-                    title="Undeploy"
-                  >
-                    <span className="flex w-4 shrink-0 justify-center">
-                      <span
-                        className="h-1.5 w-1.5 rounded-full"
-                        style={{ backgroundColor: "#ff4444", boxShadow: "0 0 4px #ff4444" }}
-                      />
-                    </span>
-                    Undeploy
-                  </button>
+                  {node.disconnected && (!node.expires_at || new Date(node.expires_at) > new Date()) ? (
+                    <button
+                      type="button"
+                      onClick={() => onRedeploy?.(node.id)}
+                      className="inline-flex items-center rounded border px-2 py-0.5 text-xs transition-opacity hover:opacity-90"
+                      style={{
+                        backgroundColor: "rgba(0,255,255,0.1)",
+                        color: "#00FFFF",
+                        borderColor: "rgba(0,255,255,0.35)",
+                      }}
+                      aria-label="Redeploy"
+                      title="Redeploy (no extra charge until session ends)"
+                    >
+                      <span className="flex w-4 shrink-0 justify-center">
+                        <span
+                          className="h-1.5 w-1.5 rounded-full"
+                          style={{ backgroundColor: "#00FFFF", boxShadow: "0 0 4px #00FFFF" }}
+                        />
+                      </span>
+                      Redeploy
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => onUndeploy?.(node.id)}
+                      className="inline-flex items-center rounded border px-2 py-0.5 text-xs transition-opacity hover:opacity-90"
+                      style={{
+                        backgroundColor: "rgba(255,68,68,0.1)",
+                        color: "#ff4444",
+                        borderColor: "rgba(255,68,68,0.35)",
+                      }}
+                      aria-label="Undeploy"
+                      title="Undeploy"
+                    >
+                      <span className="flex w-4 shrink-0 justify-center">
+                        <span
+                          className="h-1.5 w-1.5 rounded-full"
+                          style={{ backgroundColor: "#ff4444", boxShadow: "0 0 4px #ff4444" }}
+                        />
+                      </span>
+                      Undeploy
+                    </button>
+                  )}
                 </div>
               </div>
             ))

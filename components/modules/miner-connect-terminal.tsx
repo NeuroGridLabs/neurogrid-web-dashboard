@@ -72,7 +72,7 @@ export function MinerConnectTerminal({ connectTriggered, isConnected, walletAddr
         style={{ backgroundColor: "rgba(0,255,65,0.03)" }}
       >
         <span className="text-xs tracking-wider" style={{ color: "#00cc33" }}>
-          FRP Connect Terminal
+          Tunnel Connect Terminal
         </span>
         <span
           className="px-1.5 py-0.5 text-xs"
@@ -92,7 +92,7 @@ export function MinerConnectTerminal({ connectTriggered, isConnected, walletAddr
       >
         {displayLines.length === 0 && !connectTriggered && (
           <div className="px-2 py-1 text-xs" style={{ color: "rgba(0,255,65,0.3)" }}>
-            Click Connect Core via FRP to simulate sync...
+            Click Connect Core via tunnel to simulate sync...
           </div>
         )}
         {displayLines.map((line, i) => (

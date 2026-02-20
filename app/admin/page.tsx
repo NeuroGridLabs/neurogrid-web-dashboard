@@ -12,7 +12,7 @@ export default function AdminDashboard() {
   const [terminalMinimized, setTerminalMinimized] = useState(false)
 
   return (
-    <div className="flex min-h-screen flex-col" style={{ backgroundColor: "#050505" }}>
+    <div className="flex min-h-screen flex-col bg-page">
       <ScanlineOverlay />
       <Navbar />
 

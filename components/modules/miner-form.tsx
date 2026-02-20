@@ -11,6 +11,8 @@ export interface MinerFormSubmitPayload {
   gpuModel?: string
   vram?: string
   gateway?: string
+  /** Set when tunnel (NeuroGrid protocol) is connected and verification passed; required for registration to succeed. */
+  tunnelVerified?: boolean
 }
 
 interface MinerFormProps {
@@ -30,6 +32,7 @@ export function MinerForm({ priceRange, gpuTypeLabel = "Same type", canRegister 
   const [price, setPrice] = useState(0.59)
   const [bandwidth, setBandwidth] = useState("")
   const [fingerprintReady, setFingerprintReady] = useState(false)
+  const [tunnelVerified, setTunnelVerified] = useState(false)
 
   const handleFingerprint = () => {
     setFingerprintReady(true)
@@ -47,6 +50,7 @@ export function MinerForm({ priceRange, gpuTypeLabel = "Same type", canRegister 
       gpuModel: gpuModel.trim() || undefined,
       vram: vram.trim() || undefined,
       gateway: gateway.trim() || undefined,
+      tunnelVerified: tunnelVerified || undefined,
     })
   }
 
@@ -66,7 +70,7 @@ export function MinerForm({ priceRange, gpuTypeLabel = "Same type", canRegister 
         onChange={(e) => setVram(e.target.value)}
       />
       <HackerInput
-        label="FRP Gateway Address"
+        label="Tunnel Gateway Address"
         placeholder="e.g. yournode.ngrid.io"
         value={gateway}
         onChange={(e) => setGateway(e.target.value)}
@@ -108,6 +112,24 @@ export function MinerForm({ priceRange, gpuTypeLabel = "Same type", canRegister 
         value={bandwidth}
         onChange={(e) => setBandwidth(e.target.value)}
       />
+
+      {/* Tunnel verification — registration succeeds only when this is checked (after NeuroClient / tunnel connected) */}
+      <div className="flex flex-col gap-2">
+        <label className="flex cursor-pointer items-center gap-2">
+          <input
+            type="checkbox"
+            checked={tunnelVerified}
+            onChange={(e) => setTunnelVerified(e.target.checked)}
+            className="h-4 w-4 accent-[#00FF41]"
+          />
+          <span className="text-xs uppercase tracking-wider" style={{ color: "rgba(0,255,65,0.5)" }}>
+            Tunnel connected — verification passed
+          </span>
+        </label>
+        <p className="text-xs" style={{ color: "rgba(255,255,255,0.45)" }}>
+          Registration will fail until the tunnel is verified. Connect using NeuroClient (or backend-provisioned config), then check this box and submit.
+        </p>
+      </div>
 
       {/* Hardware fingerprint — required before register */}
       <div className="flex flex-col gap-2">

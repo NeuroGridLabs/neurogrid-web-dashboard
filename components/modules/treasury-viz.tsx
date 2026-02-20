@@ -129,20 +129,20 @@ export function TreasuryViz() {
         <>
           <div className="grid grid-cols-3 gap-px" style={{ backgroundColor: "rgba(0,255,65,0.05)" }}>
             <div className="flex flex-col gap-1 p-3" style={{ backgroundColor: "var(--terminal-bg)" }}>
-              <span className="text-xs" style={{ color: "rgba(0,255,65,0.4)" }}>Total Reserve</span>
-              <span className="text-sm font-bold tabular-nums" style={{ color: "#00FF41" }}>
+              <span className="text-[10px] uppercase tracking-wider" style={{ color: "rgba(0,255,65,0.55)" }}>Total Reserve</span>
+              <span className="text-3xl font-bold leading-tight tabular-nums" style={{ color: "#00FF41" }}>
                 ${data.totalReserveUsd.toLocaleString(undefined, { maximumFractionDigits: 0 })}
               </span>
             </div>
             <div className="flex flex-col gap-1 p-3" style={{ backgroundColor: "var(--terminal-bg)" }}>
-              <span className="text-xs" style={{ color: "rgba(0,255,65,0.4)" }}>P_floor</span>
-              <span className="text-sm font-bold tabular-nums" style={{ color: "#00FF41" }}>
+              <span className="text-[10px] uppercase tracking-wider" style={{ color: "rgba(0,255,65,0.55)" }}>P_floor</span>
+              <span className="text-3xl font-bold leading-tight tabular-nums" style={{ color: "#00FF41" }}>
                 ${data.pFloor.toFixed(4)}
               </span>
             </div>
             <div className="flex flex-col gap-1 p-3" style={{ backgroundColor: "var(--terminal-bg)" }}>
-              <span className="text-xs" style={{ color: "rgba(0,255,65,0.4)" }}>Eco Pool</span>
-              <span className="text-sm font-bold tabular-nums" style={{ color: "#00FF41" }}>
+              <span className="text-[10px] uppercase tracking-wider" style={{ color: "rgba(0,255,65,0.55)" }}>Eco Pool</span>
+              <span className="text-3xl font-bold leading-tight tabular-nums" style={{ color: "#00FF41" }}>
                 ${data.ecoPoolBalanceUsd.toLocaleString(undefined, { maximumFractionDigits: 0 })}
               </span>
             </div>

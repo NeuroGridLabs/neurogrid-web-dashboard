@@ -15,6 +15,19 @@ const config: Config = {
         mono: ['var(--font-geist-mono)'],
       },
       colors: {
+        /* NeuroGrid semantic (from app/globals.css vars) */
+        page: 'var(--matrix-dark)',
+        terminal: {
+          DEFAULT: 'var(--terminal-bg)',
+          bg: 'var(--terminal-bg)',
+        },
+        neon: {
+          DEFAULT: 'var(--matrix-green)',
+          dim: 'var(--matrix-green-dim)',
+        },
+        'neon-cyan': 'var(--asset-blue)',
+        'neon-cyan-dim': 'var(--asset-blue-dim)',
+        'neon-amber': '#ffc800',
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
         card: {

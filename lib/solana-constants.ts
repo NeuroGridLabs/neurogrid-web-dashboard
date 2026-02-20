@@ -6,6 +6,14 @@ const TREASURY_WALLET_ADDRESS_STR =
 
 export const TREASURY_WALLET_ADDRESS = new PublicKey(TREASURY_WALLET_ADDRESS_STR)
 
+/**
+ * Dedicated Admin Wallet that owns and manages the Alpha-01 Genesis Node.
+ * Any node with this minerWalletAddress is displayed as "[FOUNDATION GENESIS]".
+ * When this wallet connects on the Miner page, "Genesis Command Center" view is shown.
+ */
+export const ADMIN_WALLET_ADDRESS =
+  process.env.NEXT_PUBLIC_ADMIN_WALLET ?? "8KRqwem4WFs1JtTK7oQSDvEKqB8e1DkqygSLbb9StBva"
+
 /** Solana Mainnet USDT mint — 95/5 SPL token split (miner 95%, treasury 5%). */
 const USDT_MINT_ADDRESS_STR = "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"
 

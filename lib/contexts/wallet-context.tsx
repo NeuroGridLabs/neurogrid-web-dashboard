@@ -14,13 +14,14 @@ interface WalletContextValue {
   address: string | null
   openConnectModal: () => void
   openAccountModal: () => void
+  disconnect: () => Promise<void>
 }
 
 const WalletContext = createContext<WalletContextValue | null>(null)
 
 /** Must be used inside Solana WalletProvider + WalletModalProvider (e.g. SolanaProviders). */
 export function WalletProvider({ children }: { children: ReactNode }) {
-  const { publicKey } = useSolanaWallet()
+  const { publicKey, disconnect: solanaDisconnect } = useSolanaWallet()
   const { setVisible } = useWalletModal()
 
   const value = useMemo<WalletContextValue>(
@@ -29,8 +30,9 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       address: publicKey?.toBase58() ?? null,
       openConnectModal: () => setVisible(true),
       openAccountModal: () => setVisible(true),
+      disconnect: () => solanaDisconnect(),
     }),
-    [publicKey, setVisible]
+    [publicKey, setVisible, solanaDisconnect]
   )
 
   return (

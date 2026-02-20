@@ -9,6 +9,9 @@ import { PRODUCTION_TREASURY } from "@/lib/treasury-api"
 const NARRATIVE =
   "NeuroGrid Epoch Treasury. 100% of protocol fees are routed to the Solana Multi-sig for continuous $NRG buybacks. Hard-asset reserve rebalance is triggered automatically every $10,000 USDT accumulated."
 
+const ALPHA01_NOTE =
+  "Alpha-01 (Foundation Seed Node): 95% operator revenue is also routed to the Treasury for the first 12 months — 100% community-aligned."
+
 function formatTime(ms: number) {
   return new Date(ms).toLocaleTimeString("en-US", { hour12: false })
 }
@@ -243,9 +246,9 @@ function VaultCard({
         boxShadow: isActive ? "0 0 0 1px rgba(0,255,65,0.15)" : undefined,
       }}
     >
-      {/* 上方内容区 — flex-1 占满剩余空间，使下方余额行在各卡同一水平线 */}
+      {/* Content area — flex-1 fills remaining space so balance row aligns across cards */}
       <div className="flex min-h-0 flex-1 flex-col gap-2">
-        {/* 标题行 — 固定高度，多卡水平对齐 */}
+        {/* Title row — fixed height, aligned across cards */}
         <div className="flex min-h-6 shrink-0 items-center justify-between gap-2">
           <span
             className="truncate text-xs font-bold uppercase tracking-wider"
@@ -259,7 +262,7 @@ function VaultCard({
           />
         </div>
 
-        {/* 地址行 — 固定高度 */}
+        {/* Address row — fixed height */}
         <div className="flex min-h-6 shrink-0 items-center gap-1.5 font-mono text-xs">
           <span style={{ color: "#00FF41" }} title={address}>
             {short}
@@ -281,14 +284,14 @@ function VaultCard({
           )}
         </div>
 
-        {/* 描述 — 固定高度两行，多卡水平对齐 */}
+        {/* Description — two lines fixed height, aligned across cards */}
         <div className="min-h-[2.5rem] shrink-0">
           <p className="text-[11px] leading-snug" style={{ color: "rgba(0,255,65,0.55)" }}>
             {description}
           </p>
         </div>
 
-        {/* 状态徽章行 — 固定高度 */}
+        {/* Status badge row — fixed height */}
         <div className="flex min-h-7 shrink-0 flex-wrap items-center gap-2">
           <span
             className={`w-fit px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${isActive ? "animate-pulse" : ""}`}
@@ -413,6 +416,17 @@ export function TrustCenter() {
           </div>
           <p className="mb-4 text-xs leading-relaxed" style={{ color: "rgba(0,255,65,0.5)" }}>
             {NARRATIVE}
+          </p>
+          <p
+            className="mb-4 flex items-center gap-2 rounded border px-3 py-2 text-xs"
+            style={{
+              borderColor: "rgba(0,255,255,0.25)",
+              backgroundColor: "rgba(0,255,255,0.04)",
+              color: "rgba(0,255,255,0.9)",
+            }}
+          >
+            <span aria-hidden style={{ color: "#00FFFF" }}>◇</span>
+            {ALPHA01_NOTE}
           </p>
 
           <LiveFlowSection />

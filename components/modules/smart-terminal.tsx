@@ -5,10 +5,14 @@ import {
   useRef,
   useEffect,
   useCallback,
+  useMemo,
   type KeyboardEvent,
 } from "react"
-import { ChevronDown, Minus, Square, X } from "lucide-react"
+import { ChevronDown, Minus, Square, X, Bug } from "lucide-react"
 import { TerminalLog, type LogType } from "@/components/atoms/terminal-log"
+import { useMinerRegistry } from "@/lib/contexts"
+import { FOUNDATION_GENESIS_NODE_ID } from "@/lib/genesis-node"
+import { toast } from "sonner"
 
 interface TerminalLine {
   type: "input" | "output" | LogType
@@ -16,14 +20,37 @@ interface TerminalLine {
   timestamp?: string
 }
 
-const INITIAL_LINES: TerminalLine[] = [
-  { type: "SYSTEM", content: "NeuroGrid Protocol v3.4 -- Admin Terminal" },
-  { type: "SYSTEM", content: "Type 'help' for available commands." },
-  { type: "NETWORK", content: "Genesis Node Alpha-01 [STANDBY - BOOTSTRAPPING]" },
-  { type: "PHYSICAL", content: "Hardware: Locked [RTX 4090 Pool] | Awaiting Whitelist Ignition" },
-  { type: "NETWORK", content: "FRP tunnel status: PENDING_IGNITION | Ping: Awaiting Gateway" },
-  { type: "SYSTEM", content: "Polling Genesis Smart Contract for ignition signal..." },
-]
+const INITIAL_LINES_COUNT = 6
+
+function buildGenesisStatusLines(
+  genesisIgnited: boolean,
+  alpha01RentedBy: string | null
+): TerminalLine[] {
+  const status = !genesisIgnited
+    ? "STANDBY - BOOTSTRAPPING"
+    : alpha01RentedBy
+      ? "OCCUPIED"
+      : "ONLINE_IDLE"
+  const hardware = !genesisIgnited
+    ? "Hardware: Locked [RTX 4090 Pool] | Awaiting Whitelist Ignition"
+    : "Hardware: Ready [RTX 4090 Pool] | Idle"
+  const tunnelStatus = !genesisIgnited
+    ? "Tunnel status: PENDING_IGNITION | Ping: Awaiting Gateway"
+    : "Tunnel status: READY | Ping: Gateway OK"
+  const poll = !genesisIgnited
+    ? "Polling Genesis Smart Contract for ignition signal..."
+    : alpha01RentedBy
+      ? "Genesis Alpha-01 in use by tenant."
+      : "Genesis Alpha-01 ready for rent."
+  return [
+    { type: "SYSTEM", content: "NeuroGrid Protocol v3.5 -- Admin Terminal" },
+    { type: "SYSTEM", content: "Type 'help' for available commands." },
+    { type: "NETWORK", content: `Genesis Node Alpha-01 [${status}]` },
+    { type: "PHYSICAL", content: hardware },
+    { type: "NETWORK", content: tunnelStatus },
+    { type: "SYSTEM", content: poll },
+  ]
+}
 
 const COMMAND_MAP: Record<string, TerminalLine[]> = {
   help: [
@@ -31,7 +58,7 @@ const COMMAND_MAP: Record<string, TerminalLine[]> = {
     { type: "SYSTEM", content: "  status     -- Node health & GPU metrics" },
     { type: "SYSTEM", content: "  nodes      -- List connected mining nodes" },
     { type: "SYSTEM", content: "  pool       -- Show reserve pool statistics" },
-    { type: "SYSTEM", content: "  tunnel     -- FRP tunnel diagnostics" },
+    { type: "SYSTEM", content: "  tunnel     -- Tunnel diagnostics" },
     { type: "SYSTEM", content: "  poi        -- Proof-of-Inference verification" },
     { type: "SYSTEM", content: "  fees       -- Fee structure breakdown" },
     { type: "SYSTEM", content: "  clear      -- Clear terminal output" },
@@ -58,7 +85,7 @@ const COMMAND_MAP: Record<string, TerminalLine[]> = {
     { type: "NETWORK", content: "  Floor Price Support: ACTIVE" },
   ],
   tunnel: [
-    { type: "NETWORK", content: "FRP Tunnel Diagnostics:" },
+    { type: "NETWORK", content: "Tunnel Diagnostics:" },
     { type: "NETWORK", content: "  Gateway: [Encrypted Tunnel Ready]" },
     { type: "NETWORK", content: "  Protocol: TLS 1.3 + QUIC" },
     { type: "PHYSICAL", content: "  Latency: 12ms (avg) | 8ms (p50) | 24ms (p99)" },
@@ -93,7 +120,18 @@ export function SmartTerminal({
   isMinimized = false,
   onToggleMinimize,
 }: SmartTerminalProps) {
-  const [lines, setLines] = useState<TerminalLine[]>(INITIAL_LINES)
+  const ctx = useMinerRegistry()
+  const genesisIgnited = ctx?.genesisIgnited ?? false
+  const alpha01RentedBy = ctx?.nodeRentals?.[FOUNDATION_GENESIS_NODE_ID] ?? null
+  const initialBlock = useMemo(
+    () => buildGenesisStatusLines(genesisIgnited, alpha01RentedBy),
+    [genesisIgnited, alpha01RentedBy]
+  )
+  const [lines, setLines] = useState<TerminalLine[]>(() => initialBlock)
+  const [showDetailedLogs, setShowDetailedLogs] = useState(false)
+  useEffect(() => {
+    setLines((prev) => [...initialBlock, ...prev.slice(INITIAL_LINES_COUNT)])
+  }, [initialBlock])
   const [input, setInput] = useState("")
   const [history, setHistory] = useState<string[]>([])
   const [historyIndex, setHistoryIndex] = useState(-1)
@@ -102,11 +140,20 @@ export function SmartTerminal({
   const inputRef = useRef<HTMLInputElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
 
-  // Epoch 0: no fake metrics — polling message only
+  const displayLines = useMemo(() => {
+    if (showDetailedLogs) return lines
+    return lines.filter(
+      (l) =>
+        !l.content.includes("Polling") &&
+        !l.content.includes("Tunnel status:")
+    )
+  }, [lines, showDetailedLogs])
+
+  // Repetitive polling (stored in full log; hidden when Detailed Logs off)
   useEffect(() => {
     const messages: TerminalLine[] = [
       { type: "SYSTEM", content: "Polling Genesis Smart Contract for ignition signal..." },
-      { type: "NETWORK", content: "FRP tunnel status: PENDING_IGNITION | Ping: Awaiting Gateway" },
+      { type: "NETWORK", content: "Tunnel status: PENDING_IGNITION | Ping: Awaiting Gateway" },
     ]
     let i = 0
     const interval = setInterval(() => {
@@ -116,6 +163,25 @@ export function SmartTerminal({
     }, 10000)
     return () => clearInterval(interval)
   }, [])
+
+  // High-value events for main view — REWARD updates Node Card + Treasury in real time
+  const addSimulatedReward = ctx?.addSimulatedReward
+  useEffect(() => {
+    const events: TerminalLine[] = [
+      { type: "SYSTEM", content: "[SUCCESS] Heartbeat Verified" },
+      { type: "NETWORK", content: "[REWARD] +0.5 NRG Interest Accrued" },
+      { type: "PHYSICAL", content: "[WARNING] Packet Loss Detected" },
+    ]
+    let j = 0
+    const t = setInterval(() => {
+      const idx = j % events.length
+      const line = { ...events[idx], timestamp: getTimestamp() }
+      setLines((prev) => [...prev, line])
+      if (idx === 1 && addSimulatedReward) addSimulatedReward(FOUNDATION_GENESIS_NODE_ID, 0.5)
+      j++
+    }, 12000)
+    return () => clearInterval(t)
+  }, [addSimulatedReward])
 
   const checkStickyScroll = useCallback(() => {
     const el = scrollRef.current
@@ -216,7 +282,7 @@ export function SmartTerminal({
             className="px-1.5 py-0.5 text-xs"
             style={{ backgroundColor: "rgba(0,255,65,0.1)", color: "#00FF41" }}
           >
-            FRP_STABLE
+            TUNNEL_STABLE
           </span>
           <span
             className="px-1.5 py-0.5 text-xs"
@@ -262,7 +328,7 @@ export function SmartTerminal({
             className="px-1.5 py-0.5 text-xs"
             style={{ backgroundColor: "rgba(0,255,65,0.1)", color: "#00FF41" }}
           >
-            FRP_STABLE
+            TUNNEL_STABLE
           </span>
           <span
             className="px-1.5 py-0.5 text-xs"
@@ -270,7 +336,30 @@ export function SmartTerminal({
           >
             PoI_VERIFIED
           </span>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setShowDetailedLogs((v) => !v)}
+              className="rounded border px-2 py-1 text-[10px]"
+              style={{ borderColor: showDetailedLogs ? "rgba(0,255,65,0.5)" : "rgba(0,255,65,0.25)", color: "rgba(0,255,65,0.8)" }}
+            >
+              {showDetailedLogs ? "Hide" : "Detailed"} Logs
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const logText = lines.map((l) => (l.timestamp ? `[${l.timestamp}] ` : "") + (l.content ?? "")).join("\n")
+                navigator.clipboard.writeText(logText || "(no logs)").then(() => {
+                  toast.success("Terminal logs copied. Include them in your bug report or feedback.")
+                }).catch(() => toast.error("Could not copy logs."))
+              }}
+              className="inline-flex items-center gap-1 rounded border px-2 py-1 text-[10px] font-medium"
+              style={{ borderColor: "rgba(0,255,65,0.35)", color: "rgba(0,255,65,0.9)" }}
+              title="Copy terminal logs for bug report / feedback"
+            >
+              <Bug className="h-3 w-3" />
+              Report Bug / Feedback
+            </button>
             <button onClick={onToggleMinimize} className="p-0.5 hover:opacity-80" aria-label="Minimize">
               <Minus className="h-3 w-3" style={{ color: "#00cc33" }} />
             </button>
@@ -293,8 +382,8 @@ export function SmartTerminal({
           }}
         />
 
-        <div className="relative z-10 flex flex-col gap-0.5">
-          {lines.map((line, i) =>
+        <div className="relative z-10 flex flex-col gap-0.5 text-[11px]">
+          {displayLines.map((line, i) =>
             line.type === "input" ? (
               <div key={i} className="flex items-start gap-2 px-2 py-0.5 text-xs">
                 {line.timestamp && (

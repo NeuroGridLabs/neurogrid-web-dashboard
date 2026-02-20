@@ -1,8 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useWallet } from "@/lib/wallet-context"
-import { useMinerRegistry, NODE_DISPLAY_NAMES } from "@/lib/miner-registry-context"
+import { useWallet, useMinerRegistry, NODE_DISPLAY_NAMES } from "@/lib/contexts"
 
 export function MyRegisteredMiners() {
   const { isConnected, address } = useWallet()
@@ -75,7 +74,7 @@ export function MyRegisteredMiners() {
                     {renter ? (
                       <>Rented by {renter.slice(0, 6)}…{renter.slice(-4)}</>
                     ) : (
-                      "Pending FRP"
+                      "Pending tunnel"
                     )}
                   </span>
                 </div>

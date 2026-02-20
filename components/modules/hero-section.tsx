@@ -2,8 +2,15 @@
 
 import { useEffect, useState, useMemo } from "react"
 import Link from "next/link"
+import { Info } from "lucide-react"
 import { NeonButton } from "@/components/atoms/neon-button"
 import { StatusBadge } from "@/components/atoms/status-badge"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 
 // Seeded pseudo-random for deterministic SSR
 function seededRandom(seed: number) {
@@ -135,23 +142,54 @@ export function HeroSection() {
     <section className="relative flex min-h-[65vh] flex-col items-center justify-center gap-10 px-4 py-16 md:py-24">
       <HexBackground />
 
-      <div className="relative z-10 flex flex-col items-center gap-6 text-center">
-        <h1
-          className="text-balance text-2xl font-bold uppercase tracking-wider md:text-4xl lg:text-5xl"
-          style={{ color: "#00FF41" }}
-        >
-          The Liquidity Layer
-          <br />
-          <span style={{ color: "#00FFFF" }}>for AI Compute</span>
-        </h1>
+      <div className="relative z-10 flex flex-col items-center gap-5 text-center">
+        <div className="flex flex-col items-center gap-2">
+          <p
+            className="text-[11px] font-medium uppercase tracking-[0.18em] md:text-xs"
+            style={{ color: "rgba(0,255,255,0.6)", letterSpacing: "0.18em" }}
+          >
+            The Decentralized Edge Grid for Neural Networks
+          </p>
+          <h1
+            className="text-balance text-2xl font-bold uppercase tracking-wider md:text-4xl lg:text-5xl"
+            style={{ color: "#00FF41" }}
+          >
+            The Liquidity Layer
+            <br />
+            <span style={{ color: "#00FFFF" }}>for AI Compute</span>
+          </h1>
+        </div>
         <p
           className="max-w-xl text-pretty font-sans text-sm leading-relaxed md:text-base"
           style={{ color: "rgba(0,255,65,0.5)" }}
         >
-          Decentralized GPU exchange powered by FRP tunneling and
-          Proof-of-Inference. Community-driven. Anti-VC. Fair launch.
+          Decentralized GPU exchange powered by NeuroGrid tunnel protocol and{" "}
+          <TooltipProvider delayDuration={200}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span
+                  className="inline-flex cursor-help items-baseline gap-0.5 border-b border-dashed border-emerald-500/40 pb-px"
+                  style={{ color: "rgba(0,255,65,0.65)" }}
+                >
+                  Proof-of-Inference
+                  <Info className="ml-0.5 h-3 w-3 shrink-0 opacity-60" aria-hidden />
+                </span>
+              </TooltipTrigger>
+              <TooltipContent
+                side="bottom"
+                className="max-w-[260px] border border-emerald-500/25 bg-zinc-950 px-3 py-2 text-[11px] leading-snug text-slate-300"
+              >
+                On-chain verification that your workload actually ran on the claimed hardware.
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+          . Community-driven. Anti-VC. Fair launch.
         </p>
-
+        <ul className="flex flex-wrap justify-center gap-x-6 gap-y-1 text-xs" style={{ color: "rgba(0,255,65,0.45)" }}>
+          <li>Smart Auth Routing (Web2 + Web3 Bipartite Access)</li>
+          <li>The Dual-Yield Security Buffer (Up to 3.0% APY)</li>
+          <li>Streaming Settlement &amp; Minimum Base Fee</li>
+        </ul>
         <div className="flex flex-wrap items-center justify-center gap-3">
           <Link href="/nodes">
             <NeonButton variant="primary">Launch dApp</NeonButton>
