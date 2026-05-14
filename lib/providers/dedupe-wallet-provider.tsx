@@ -17,10 +17,11 @@ import { useConnection, useLocalStorage } from "@solana/wallet-adapter-react"
 import { useStandardWalletAdapters } from "@solana/wallet-standard-wallet-adapter-react"
 import React, { useCallback, useEffect, useMemo, useRef, type ReactNode } from "react"
 
-import getEnvironment, {
-  Environment,
-} from "../../node_modules/@solana/wallet-adapter-react/lib/esm/getEnvironment.js"
+// @ts-expect-error — internal wallet-adapter-react ESM modules lack type declarations
+import getEnvironment, { Environment } from "../../node_modules/@solana/wallet-adapter-react/lib/esm/getEnvironment.js"
+// @ts-expect-error — internal wallet-adapter-react ESM module
 import getInferredClusterFromEndpoint from "../../node_modules/@solana/wallet-adapter-react/lib/esm/getInferredClusterFromEndpoint.js"
+// @ts-expect-error — internal wallet-adapter-react ESM module
 import { WalletProviderBase } from "../../node_modules/@solana/wallet-adapter-react/lib/esm/WalletProviderBase.js"
 
 function supportsSolanaChain(adapter: Adapter): boolean {
@@ -125,7 +126,7 @@ export function DedupeWalletProvider({
       setWalletName(null)
     }
     adapter.on("disconnect", handleDisconnect)
-    return () => adapter.off("disconnect", handleDisconnect)
+    return () => { adapter.off("disconnect", handleDisconnect) }
   }, [adapter, setWalletName, walletName])
 
   const hasUserSelectedAWallet = useRef(false)

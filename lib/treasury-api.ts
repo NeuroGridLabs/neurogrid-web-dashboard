@@ -39,6 +39,8 @@ export interface TreasuryData {
   nativeBalances: TreasuryNativeBalances
   /** USD value of each vault balance. */
   vaultBalanceUsd: TreasuryVaultBalanceUsd
+  /** True when data came from last valid cache after a fetch failure. */
+  isStale?: boolean
 }
 
 // v3.2: Strict allocation — MUST NOT MODIFY
@@ -53,6 +55,13 @@ const TOTAL_SUPPLY_NRG = 1_000_000
 const CACHE_TTL_MS = 60_000 // 1 min cache
 
 let cache: { data: TreasuryData; ts: number } | null = null
+
+/**
+ * Manually invalidate treasury cache. Called by frontend refresh action.
+ */
+export function invalidateTreasuryCache(): void {
+  cache = null
+}
 
 async function fetchWithTimeout(
   url: string,
@@ -69,6 +78,15 @@ async function fetchWithTimeout(
     clearTimeout(t)
     throw new Error("Fetch timeout")
   }
+}
+
+/** Classify errors: transient (network/timeout) → retry once; permanent → throw */
+function isTransientError(e: unknown): boolean {
+  if (e instanceof Error) {
+    const msg = e.message.toLowerCase()
+    return msg.includes("timeout") || msg.includes("abort") || msg.includes("network") || msg.includes("econnrefused")
+  }
+  return false
 }
 
 async function fetchBtcBalance(address: string): Promise<number> {
@@ -198,64 +216,80 @@ function getEpochZeroTreasuryData(now: number): TreasuryData {
   }
 }
 
+async function fetchTreasuryDataOnce(): Promise<TreasuryData> {
+  const now = Date.now()
+  const addresses = getTreasuryAddresses()
+
+  const [prices, btcBal, solBal, suiBal, ethBal] = await Promise.all([
+    fetchUsdPrices(),
+    fetchBtcBalance(addresses.btc),
+    fetchSolBalance(addresses.sol),
+    fetchSuiBalance(addresses.sui),
+    fetchEthBalance(addresses.eth),
+  ])
+
+  const btcUsd = btcBal * prices.btc
+  const solUsd = solBal * prices.sol
+  const suiUsd = suiBal * prices.sui
+  const ethUsd = ethBal * prices.eth
+  const suiEthUsd = suiUsd + ethUsd
+  const nrgUsd = (btcUsd + solUsd + suiEthUsd) * 0.15 / 0.85
+
+  const totalReserveUsd = btcUsd + solUsd + suiEthUsd + nrgUsd
+
+  const targetBtc = totalReserveUsd * ASSET_WEIGHTS.btc
+  const targetSol = totalReserveUsd * ASSET_WEIGHTS.sol
+  const targetNrg = totalReserveUsd * ASSET_WEIGHTS.nrg
+  const targetSuiEth = totalReserveUsd * ASSET_WEIGHTS.suiEth
+
+  const assets: TreasuryAsset[] = [
+    { symbol: "BTC", amount: targetBtc / prices.btc, amountFormatted: (targetBtc / prices.btc).toFixed(4), usdValue: targetBtc, weight: ASSET_WEIGHTS.btc },
+    { symbol: "SOL", amount: targetSol / prices.sol, amountFormatted: (targetSol / prices.sol).toFixed(2), usdValue: targetSol, weight: ASSET_WEIGHTS.sol },
+    { symbol: "NRG", amount: targetNrg / prices.nrg, amountFormatted: (targetNrg / prices.nrg).toLocaleString(), usdValue: targetNrg, weight: ASSET_WEIGHTS.nrg },
+    { symbol: "Sui/ETH", amount: targetSuiEth / prices.eth, amountFormatted: (targetSuiEth / prices.eth).toFixed(2), usdValue: targetSuiEth, weight: ASSET_WEIGHTS.suiEth },
+  ]
+
+  const pFloor = totalReserveUsd / TOTAL_SUPPLY_NRG
+  const ecoPoolBalanceUsd = totalReserveUsd * 0.15
+
+  return {
+    assets,
+    totalReserveUsd,
+    pFloor,
+    ecoPoolBalanceUsd,
+    totalSupplyNrg: TOTAL_SUPPLY_NRG,
+    lastUpdated: now,
+    nativeBalances: { sol: solBal, btc: btcBal, eth: ethBal, sui: suiBal },
+    vaultBalanceUsd: { sol: solUsd, btc: btcUsd, eth: ethUsd, sui: suiUsd },
+  }
+}
+
 export async function fetchTreasuryData(skipCache = false): Promise<TreasuryData> {
   const now = Date.now()
   if (!skipCache && cache && now - cache.ts < CACHE_TTL_MS) return cache.data
 
-  const addresses = getTreasuryAddresses()
-
   try {
-    const [prices, btcBal, solBal, suiBal, ethBal] = await Promise.all([
-      fetchUsdPrices(),
-      fetchBtcBalance(addresses.btc),
-      fetchSolBalance(addresses.sol),
-      fetchSuiBalance(addresses.sui),
-      fetchEthBalance(addresses.eth),
-    ])
-
-    const btcUsd = btcBal * prices.btc
-    const solUsd = solBal * prices.sol
-    const suiUsd = suiBal * prices.sui
-    const ethUsd = ethBal * prices.eth
-    const suiEthUsd = suiUsd + ethUsd
-    const nrgUsd = (btcUsd + solUsd + suiEthUsd) * 0.15 / 0.85
-
-    const totalReserveUsd = btcUsd + solUsd + suiEthUsd + nrgUsd
-
-    const targetBtc = totalReserveUsd * ASSET_WEIGHTS.btc
-    const targetSol = totalReserveUsd * ASSET_WEIGHTS.sol
-    const targetNrg = totalReserveUsd * ASSET_WEIGHTS.nrg
-    const targetSuiEth = totalReserveUsd * ASSET_WEIGHTS.suiEth
-
-    const assets: TreasuryAsset[] = [
-      { symbol: "BTC", amount: targetBtc / prices.btc, amountFormatted: (targetBtc / prices.btc).toFixed(4), usdValue: targetBtc, weight: ASSET_WEIGHTS.btc },
-      { symbol: "SOL", amount: targetSol / prices.sol, amountFormatted: (targetSol / prices.sol).toFixed(2), usdValue: targetSol, weight: ASSET_WEIGHTS.sol },
-      { symbol: "NRG", amount: targetNrg / prices.nrg, amountFormatted: (targetNrg / prices.nrg).toLocaleString(), usdValue: targetNrg, weight: ASSET_WEIGHTS.nrg },
-      { symbol: "Sui/ETH", amount: targetSuiEth / prices.eth, amountFormatted: (targetSuiEth / prices.eth).toFixed(2), usdValue: targetSuiEth, weight: ASSET_WEIGHTS.suiEth },
-    ]
-
-    const pFloor = totalReserveUsd / TOTAL_SUPPLY_NRG
-    const ecoPoolBalanceUsd = totalReserveUsd * 0.15
-
-    const data: TreasuryData = {
-      assets,
-      totalReserveUsd,
-      pFloor,
-      ecoPoolBalanceUsd,
-      totalSupplyNrg: TOTAL_SUPPLY_NRG,
-      lastUpdated: now,
-      nativeBalances: { sol: solBal, btc: btcBal, eth: ethBal, sui: suiBal },
-      vaultBalanceUsd: { sol: solUsd, btc: btcUsd, eth: ethUsd, sui: suiUsd },
-    }
+    const data = await fetchTreasuryDataOnce()
     cache = { data, ts: now }
     return data
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Unknown error"
-    if (process.env.NODE_ENV === "development") {
-      console.warn("[Treasury API] Epoch 0 fallback:", msg)
+    // Transient error → retry once
+    if (isTransientError(e)) {
+      try {
+        const data = await fetchTreasuryDataOnce()
+        cache = { data, ts: now }
+        return data
+      } catch {
+        // Retry also failed — fall through to stale cache
+      }
     }
-    const fallback = getEpochZeroTreasuryData(now)
-    cache = { data: fallback, ts: now }
-    return fallback
+
+    // Return last valid cached data if available (don't overwrite with zero)
+    if (cache) {
+      return { ...cache.data, isStale: true }
+    }
+
+    // No cache at all — return Epoch 0 fallback (but do NOT cache zero values)
+    return { ...getEpochZeroTreasuryData(now), isStale: true }
   }
 }

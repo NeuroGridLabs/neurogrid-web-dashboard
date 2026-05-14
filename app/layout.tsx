@@ -5,7 +5,9 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import { ThemeProvider } from '@/components/theme-provider'
 import { Toaster } from '@/components/ui/sonner'
 import { SolanaProviders } from '@/lib/providers'
+import { QueryProvider } from '@/lib/providers/query-provider'
 import { WalletProvider, AuthProvider, RoleProvider, MinerRegistryProvider } from '@/lib/contexts'
+import { ErrorBoundary } from '@/components/error-boundary'
 import './globals.css'
 
 const geistMono = Geist_Mono({
@@ -43,13 +45,16 @@ export default function RootLayout({
         className={`${geistMono.variable} ${inter.variable} font-mono antialiased`}
       >
         <ThemeProvider attribute="class" defaultTheme="dark">
+          <QueryProvider>
           <SolanaProviders>
             <WalletProvider>
               <AuthProvider>
                 <RoleProvider>
                 <MinerRegistryProvider>
                   <TooltipProvider delayDuration={200}>
-                    {children}
+                    <ErrorBoundary>
+                      {children}
+                    </ErrorBoundary>
                     <Toaster richColors position="top-center" />
                   </TooltipProvider>
                 </MinerRegistryProvider>
@@ -57,6 +62,7 @@ export default function RootLayout({
               </AuthProvider>
             </WalletProvider>
           </SolanaProviders>
+          </QueryProvider>
         </ThemeProvider>
       </body>
     </html>

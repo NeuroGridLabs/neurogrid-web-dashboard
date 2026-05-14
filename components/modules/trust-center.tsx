@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useRef, useEffect } from "react"
 import { Shield, ExternalLink, Activity, Copy } from "lucide-react"
 import { TerminalLog } from "@/components/atoms/terminal-log"
 import { useTreasuryData } from "@/components/modules/treasury-api"
@@ -219,8 +219,13 @@ function VaultCard({
   nrgBalance,
 }: VaultCardProps) {
   const [copied, setCopied] = useState(false)
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const short = truncateAddress(address, chain)
   const href = getExplorerHref(chain, address)
+
+  useEffect(() => {
+    return () => { if (copyTimerRef.current) clearTimeout(copyTimerRef.current) }
+  }, [])
 
   const copyAddress = async (e: React.MouseEvent) => {
     e.preventDefault()
@@ -228,7 +233,8 @@ function VaultCard({
     try {
       await navigator.clipboard.writeText(address)
       setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current)
+      copyTimerRef.current = setTimeout(() => setCopied(false), 2000)
     } catch {}
   }
 
@@ -394,7 +400,7 @@ function getBalanceData(chain: string, treasury: TreasuryLike): VaultBalanceData
 
 /** SOL vault: NRG balance (locked repurchased tokens). From API/Oracle when available. */
 function getSolVaultNrgBalance(_treasury: TreasuryLike): VaultBalanceData {
-  // TODO: wire to treasury API / SPL token balance for NRG in vault
+  // MOCK:Epoch0 — wire to SPL token balance for NRG in vault when token is live
   return { nativeAmount: 0, usdValue: 0, ticker: "NRG" }
 }
 

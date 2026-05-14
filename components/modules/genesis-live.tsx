@@ -4,7 +4,7 @@ import { StatusBadge } from "@/components/atoms/status-badge"
 import { DollarSign, HardDrive, Cpu, MemoryStick } from "lucide-react"
 
 // Genesis Node: locked RTX 4090 specs — not live yet; bootstrapping / waitlist
-const WAITLIST_URL = process.env.NEXT_PUBLIC_GENESIS_WAITLIST_URL || "https://discord.gg"
+const WAITLIST_URL = process.env.NEXT_PUBLIC_GENESIS_WAITLIST_URL || ""
 
 export function GenesisLive() {
   return (
@@ -80,17 +80,19 @@ export function GenesisLive() {
           </div>
 
           {/* CTA: Join waitlist → Discord / Telegram / Twitter */}
-          <div className="flex border-t border-border px-4 py-3">
-            <a
-              href={WAITLIST_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs font-bold uppercase tracking-wider transition-colors hover:opacity-90"
-              style={{ color: "#00FF41" }}
-            >
-              {'>'} JOIN GENESIS WAITLIST
-            </a>
-          </div>
+          {WAITLIST_URL && (
+            <div className="flex border-t border-border px-4 py-3">
+              <a
+                href={WAITLIST_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs font-bold uppercase tracking-wider transition-colors hover:opacity-90"
+                style={{ color: "#00FF41" }}
+              >
+                {'>'} JOIN GENESIS WAITLIST
+              </a>
+            </div>
+          )}
         </div>
       </div>
     </section>

@@ -38,6 +38,7 @@ export function MinerFinancialCards() {
     let apyBuffer = 0.003
     myNodeIds.forEach((id) => {
       const f = getFinancials(id)
+      if (!f) return
       available_balance += f.free_balance_usd ?? 0
       security_buffer += f.security_buffer_usd ?? 0
       earned_nrg += f.earned_nrg ?? 0

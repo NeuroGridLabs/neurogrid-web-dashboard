@@ -198,7 +198,10 @@ export function PricingSlider() {
   const platformHourly = useMemo(() => {
     let total = 0
     Object.keys(nodeToMiner).forEach((id) => {
-      if (nodeRentals[id]) total += parsePriceToNumber(nodePrices[id] ?? "$0")
+      if (nodeRentals[id]) {
+        const v = parsePriceToNumber(nodePrices[id] ?? "$0")
+        if (Number.isFinite(v)) total += v
+      }
     })
     return total
   }, [nodeToMiner, nodeRentals, nodePrices])
@@ -207,8 +210,10 @@ export function PricingSlider() {
     if (!address) return 0
     let total = 0
     Object.keys(nodeToMiner).forEach((id) => {
-      if (nodeToMiner[id] === address && nodeRentals[id])
-        total += parsePriceToNumber(nodePrices[id] ?? "$0")
+      if (nodeToMiner[id] === address && nodeRentals[id]) {
+        const v = parsePriceToNumber(nodePrices[id] ?? "$0")
+        if (Number.isFinite(v)) total += v
+      }
     })
     return total
   }, [address, nodeToMiner, nodeRentals, nodePrices])
@@ -217,7 +222,7 @@ export function PricingSlider() {
     if (!address) return "0"
     if (accountHourly <= 0) return "0"
     const estimatedTotal = Math.round(accountHourly * 24 * 30 * 0.7)
-    return estimatedTotal.toLocaleString()
+    return estimatedTotal.toLocaleString("en-US")
   }, [address, accountHourly])
 
   const treasuryAggregate = useMemo(() => {
@@ -264,7 +269,8 @@ export function PricingSlider() {
     if (!emergencyReleaseNodeId) return
     const f = getFinancials(emergencyReleaseNodeId)
     forceEmergencyRelease(emergencyReleaseNodeId)
-    toast.error(`Emergency release. 50% buffer slashed ($${(f.security_buffer_usd * 0.5).toFixed(2)}).`)
+    const slashAmount = (f?.security_buffer_usd ?? 0) * 0.5
+    toast.error(`Emergency release. 50% buffer slashed ($${slashAmount.toFixed(2)}).`)
     setEmergencyReleaseNodeId(null)
   }
 
@@ -304,7 +310,7 @@ export function PricingSlider() {
                     Platform accumulated assets
                   </span>
                   <span className="text-xl font-bold tabular-nums" style={{ color: "#00FF41" }}>
-                    ${treasury ? Math.round(treasury.totalReserveUsd).toLocaleString() : "—"}
+                    ${treasury ? Math.round(treasury.totalReserveUsd).toLocaleString("en-US") : "—"}
                   </span>
                 </div>
               </div>

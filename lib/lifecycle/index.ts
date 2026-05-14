@@ -7,6 +7,7 @@ export {
   computeEscrowBreakdown,
   earlyCancelChargeUsd,
   earlyCancelRefundUsd,
+  getCurrentPeriodEnd,
   EXPECTED_HOURS_MIN,
 } from "./escrow"
 export {
@@ -19,7 +20,6 @@ export {
 export {
   bufferCapUsd,
   allocateOrderProfit,
-  allocateOrderProfitStrict,
   canWithdrawBuffer,
   poolApyFree,
   poolApyBuffer,

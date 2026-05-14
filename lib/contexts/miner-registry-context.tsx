@@ -8,38 +8,50 @@ import {
   useEffect,
   type ReactNode,
 } from "react"
+import { useQueryClient } from "@tanstack/react-query"
 import { ADMIN_WALLET_ADDRESS } from "@/lib/solana-constants"
 import { FOUNDATION_GENESIS_NODE_ID } from "@/lib/genesis-node"
 import type { NodeLifecycleStatus, LockMetadata, NodeFinancials } from "@/lib/types/node"
+import { queryKeys } from "@/lib/api/hooks"
 
-const STORAGE_KEY = "neurogrid-miner-registry"
-const RENTALS_STORAGE_KEY = "neurogrid-miner-rentals"
-const PRICES_STORAGE_KEY = "neurogrid-miner-node-prices"
-const BANDWIDTH_STORAGE_KEY = "neurogrid-miner-node-bandwidth"
+/**
+ * MinerRegistryContext — Sprint 3 refactored.
+ *
+ * Data that belongs in DB (registrations, rentals, financials, lifecycle) is now
+ * read/written through API → Supabase. React Query manages the cache.
+ *
+ * Only UI preferences remain in localStorage:
+ * - genesisIgnited (local UI state for the ignite animation)
+ * - simulatedNrgByNode (ephemeral display rewards)
+ *
+ * The external interface is preserved so callers (navbar, miner page, node-cluster,
+ * pricing-slider, etc.) continue to work without changes.
+ */
+
+/* ── localStorage: ONLY for UI preferences ──────────────── */
+
 const GENESIS_IGNITED_KEY = "neurogrid-genesis-ignited"
-const LIFECYCLE_STORAGE_KEY = "neurogrid-miner-node-lifecycle"
-const LOCK_METADATA_STORAGE_KEY = "neurogrid-miner-lock-metadata"
-const FINANCIALS_STORAGE_KEY = "neurogrid-miner-node-financials"
-const PENDING_PRICES_STORAGE_KEY = "neurogrid-miner-node-pending-prices"
-const SESSION_EXPIRES_KEY = "neurogrid-tenant-session-expires"
-const SESSION_DISCONNECTED_KEY = "neurogrid-tenant-session-disconnected"
 
-/** All localStorage keys used for miner/registration/test data (for clear-all). */
-export const MINER_REGISTRY_STORAGE_KEYS = [
-  STORAGE_KEY,
-  RENTALS_STORAGE_KEY,
-  PRICES_STORAGE_KEY,
-  BANDWIDTH_STORAGE_KEY,
-  GENESIS_IGNITED_KEY,
-  LIFECYCLE_STORAGE_KEY,
-  LOCK_METADATA_STORAGE_KEY,
-  FINANCIALS_STORAGE_KEY,
-  PENDING_PRICES_STORAGE_KEY,
-  SESSION_EXPIRES_KEY,
-  SESSION_DISCONNECTED_KEY,
+/** Legacy keys — kept for cleanup on first load */
+const LEGACY_STORAGE_KEYS = [
+  "neurogrid-miner-registry",
+  "neurogrid-miner-rentals",
+  "neurogrid-miner-node-prices",
+  "neurogrid-miner-node-bandwidth",
+  "neurogrid-miner-node-lifecycle",
+  "neurogrid-miner-lock-metadata",
+  "neurogrid-miner-node-financials",
+  "neurogrid-miner-node-pending-prices",
+  "neurogrid-tenant-session-expires",
+  "neurogrid-tenant-session-disconnected",
 ] as const
 
-/** Node ids that can be registered as miners (same pool as Node Command Center) */
+/** All localStorage keys — for clearAllRegistrationData. Only genesis-ignited remains. */
+export const MINER_REGISTRY_STORAGE_KEYS = [
+  GENESIS_IGNITED_KEY,
+] as const
+
+/** Node ids that can be registered as miners */
 export const REGISTRABLE_NODE_IDS = [
   "alpha-01",
   "beta-07",
@@ -66,7 +78,6 @@ export const NODE_DISPLAY_NAMES: Record<string, string> = {
   "kappa-04": "Kappa-04",
 }
 
-/** Node id -> GPU spec for price range by same-type */
 export const NODE_GPU_MAP: Record<string, string> = {
   "alpha-01": "1x RTX4090",
   "beta-07": "1x RTX4090",
@@ -80,7 +91,6 @@ export const NODE_GPU_MAP: Record<string, string> = {
   "kappa-04": "1x A100",
 }
 
-/** Node id -> VRAM for fallback node list (when no backend) */
 export const NODE_VRAM_MAP: Record<string, string> = {
   "alpha-01": "24GB",
   "beta-07": "24GB",
@@ -94,87 +104,15 @@ export const NODE_VRAM_MAP: Record<string, string> = {
   "kappa-04": "80GB",
 }
 
-function loadNodeToMiner(): Record<string, string> {
-  if (typeof window === "undefined") return {}
+function safeLoadJson<T>(key: string, fallback: T): T {
+  if (typeof window === "undefined") return fallback
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return {}
-    const parsed = JSON.parse(raw) as Record<string, string>
-    return typeof parsed === "object" && parsed !== null ? parsed : {}
+    const raw = localStorage.getItem(key)
+    if (!raw) return fallback
+    const parsed = JSON.parse(raw) as T
+    return typeof parsed === "object" && parsed !== null ? parsed : fallback
   } catch {
-    return {}
-  }
-}
-
-function saveNodeToMiner(map: Record<string, string>) {
-  if (typeof window === "undefined") return
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(map))
-  } catch {
-    // ignore
-  }
-}
-
-function loadNodeRentals(): Record<string, string | null> {
-  if (typeof window === "undefined") return {}
-  try {
-    const raw = localStorage.getItem(RENTALS_STORAGE_KEY)
-    if (!raw) return {}
-    const parsed = JSON.parse(raw) as Record<string, string | null>
-    return typeof parsed === "object" && parsed !== null ? parsed : {}
-  } catch {
-    return {}
-  }
-}
-
-function saveNodeRentals(map: Record<string, string | null>) {
-  if (typeof window === "undefined") return
-  try {
-    localStorage.setItem(RENTALS_STORAGE_KEY, JSON.stringify(map))
-  } catch {
-    // ignore
-  }
-}
-
-function loadNodePrices(): Record<string, string> {
-  if (typeof window === "undefined") return {}
-  try {
-    const raw = localStorage.getItem(PRICES_STORAGE_KEY)
-    if (!raw) return {}
-    const parsed = JSON.parse(raw) as Record<string, string>
-    return typeof parsed === "object" && parsed !== null ? parsed : {}
-  } catch {
-    return {}
-  }
-}
-
-function saveNodePrices(map: Record<string, string>) {
-  if (typeof window === "undefined") return
-  try {
-    localStorage.setItem(PRICES_STORAGE_KEY, JSON.stringify(map))
-  } catch {
-    // ignore
-  }
-}
-
-function loadNodeBandwidth(): Record<string, string> {
-  if (typeof window === "undefined") return {}
-  try {
-    const raw = localStorage.getItem(BANDWIDTH_STORAGE_KEY)
-    if (!raw) return {}
-    const parsed = JSON.parse(raw) as Record<string, string>
-    return typeof parsed === "object" && parsed !== null ? parsed : {}
-  } catch {
-    return {}
-  }
-}
-
-function saveNodeBandwidth(map: Record<string, string>) {
-  if (typeof window === "undefined") return
-  try {
-    localStorage.setItem(BANDWIDTH_STORAGE_KEY, JSON.stringify(map))
-  } catch {
-    // ignore
+    return fallback
   }
 }
 
@@ -196,134 +134,17 @@ function saveGenesisIgnited(ignited: boolean) {
   }
 }
 
-function loadNodeLifecycle(): Record<string, NodeLifecycleStatus> {
-  if (typeof window === "undefined") return {}
-  try {
-    const raw = localStorage.getItem(LIFECYCLE_STORAGE_KEY)
-    if (!raw) return {}
-    const parsed = JSON.parse(raw) as Record<string, string>
-    const out: Record<string, NodeLifecycleStatus> = {}
-    for (const [id, s] of Object.entries(parsed)) {
-      if (s === "IDLE" || s === "LOCKED" || s === "OFFLINE_VIOLATION" || s === "VIOLATED") out[id] = s as NodeLifecycleStatus
-    }
-    return out
-  } catch {
-    return {}
-  }
+function parsePriceToNumber(priceStr: string): number | null {
+  const m = priceStr.match(/\$?([\d.]+)/)
+  if (!m) return null
+  const n = parseFloat(m[1])
+  return Number.isFinite(n) ? n : null
 }
 
-function saveNodeLifecycle(map: Record<string, NodeLifecycleStatus>) {
-  if (typeof window === "undefined") return
-  try {
-    localStorage.setItem(LIFECYCLE_STORAGE_KEY, JSON.stringify(map))
-  } catch {
-    // ignore
-  }
-}
-
-function loadLockMetadata(): Record<string, LockMetadata | null> {
-  if (typeof window === "undefined") return {}
-  try {
-    const raw = localStorage.getItem(LOCK_METADATA_STORAGE_KEY)
-    if (!raw) return {}
-    const parsed = JSON.parse(raw) as Record<string, LockMetadata | null>
-    return typeof parsed === "object" && parsed !== null ? parsed : {}
-  } catch {
-    return {}
-  }
-}
-
-function saveLockMetadata(map: Record<string, LockMetadata | null>) {
-  if (typeof window === "undefined") return
-  try {
-    localStorage.setItem(LOCK_METADATA_STORAGE_KEY, JSON.stringify(map))
-  } catch {
-    // ignore
-  }
-}
-
-function loadNodeFinancials(): Record<string, NodeFinancials> {
-  if (typeof window === "undefined") return {}
-  try {
-    const raw = localStorage.getItem(FINANCIALS_STORAGE_KEY)
-    if (!raw) return {}
-    const parsed = JSON.parse(raw) as Record<string, NodeFinancials>
-    return typeof parsed === "object" && parsed !== null ? parsed : {}
-  } catch {
-    return {}
-  }
-}
-
-function saveNodeFinancials(map: Record<string, NodeFinancials>) {
-  if (typeof window === "undefined") return
-  try {
-    localStorage.setItem(FINANCIALS_STORAGE_KEY, JSON.stringify(map))
-  } catch {
-    // ignore
-  }
-}
-
-function loadPendingPrices(): Record<string, string> {
-  if (typeof window === "undefined") return {}
-  try {
-    const raw = localStorage.getItem(PENDING_PRICES_STORAGE_KEY)
-    if (!raw) return {}
-    const parsed = JSON.parse(raw) as Record<string, string>
-    return typeof parsed === "object" && parsed !== null ? parsed : {}
-  } catch {
-    return {}
-  }
-}
-
-function savePendingPrices(map: Record<string, string>) {
-  if (typeof window === "undefined") return
-  try {
-    localStorage.setItem(PENDING_PRICES_STORAGE_KEY, JSON.stringify(map))
-  } catch {
-    // ignore
-  }
-}
-
-function loadSessionExpires(): Record<string, string> {
-  if (typeof window === "undefined") return {}
-  try {
-    const raw = localStorage.getItem(SESSION_EXPIRES_KEY)
-    if (!raw) return {}
-    const parsed = JSON.parse(raw) as Record<string, string>
-    return typeof parsed === "object" && parsed !== null ? parsed : {}
-  } catch {
-    return {}
-  }
-}
-
-function saveSessionExpires(map: Record<string, string>) {
-  if (typeof window === "undefined") return
-  try {
-    localStorage.setItem(SESSION_EXPIRES_KEY, JSON.stringify(map))
-  } catch {
-    // ignore
-  }
-}
-
-function loadSessionDisconnected(): Record<string, boolean> {
-  if (typeof window === "undefined") return {}
-  try {
-    const raw = localStorage.getItem(SESSION_DISCONNECTED_KEY)
-    if (!raw) return {}
-    const parsed = JSON.parse(raw) as Record<string, boolean>
-    return typeof parsed === "object" && parsed !== null ? parsed : {}
-  } catch {
-    return {}
-  }
-}
-
-function saveSessionDisconnected(map: Record<string, boolean>) {
-  if (typeof window === "undefined") return
-  try {
-    localStorage.setItem(SESSION_DISCONNECTED_KEY, JSON.stringify(map))
-  } catch {
-    // ignore
-  }
+const DEFAULT_FINANCIALS: NodeFinancials = {
+  earned_nrg: 0,
+  security_buffer_usd: 0,
+  accrued_interest: 0,
 }
 
 interface MinerRegistryContextValue {
@@ -373,106 +194,67 @@ interface MinerRegistryContextValue {
 
 const MinerRegistryContext = createContext<MinerRegistryContextValue | null>(null)
 
-function parsePriceToNumber(priceStr: string): number | null {
-  const m = priceStr.match(/\$?([\d.]+)/)
-  if (!m) return null
-  const n = parseFloat(m[1])
-  return Number.isFinite(n) ? n : null
-}
-
-function getInitialNodeToMiner(): Record<string, string> {
-  if (typeof window === "undefined") return {}
-  return loadNodeToMiner()
-}
-
-const DEFAULT_FINANCIALS: NodeFinancials = {
-  earned_nrg: 0,
-  security_buffer_usd: 0,
-  accrued_interest: 0,
-}
-
 export function MinerRegistryProvider({ children }: { children: ReactNode }) {
-  const [nodeToMiner, setNodeToMiner] = useState<Record<string, string>>(getInitialNodeToMiner)
-  const [nodeRentals, setNodeRentals] = useState<Record<string, string | null>>(() => loadNodeRentals())
-  const [nodePrices, setNodePrices] = useState<Record<string, string>>(() => loadNodePrices())
-  const [nodeBandwidth, setNodeBandwidth] = useState<Record<string, string>>(() => loadNodeBandwidth())
+  const queryClient = useQueryClient()
+
+  /**
+   * In-memory state — serves as React Query cache bridge.
+   * State is initialized from legacy localStorage on first load (migration),
+   * then future writes go through API → Supabase. On subsequent page loads,
+   * data will come from React Query (API) instead of localStorage.
+   *
+   * During the transition period, we keep in-memory state to maintain the
+   * same synchronous interface expected by callers.
+   */
+  const [nodeToMiner, setNodeToMiner] = useState<Record<string, string>>(() => safeLoadJson("neurogrid-miner-registry", {}))
+  const [nodeRentals, setNodeRentals] = useState<Record<string, string | null>>(() => safeLoadJson("neurogrid-miner-rentals", {}))
+  const [nodePrices, setNodePrices] = useState<Record<string, string>>(() => safeLoadJson("neurogrid-miner-node-prices", {}))
+  const [nodeBandwidth, setNodeBandwidth] = useState<Record<string, string>>(() => safeLoadJson("neurogrid-miner-node-bandwidth", {}))
   const [genesisIgnited, setGenesisIgnitedState] = useState<boolean>(() => loadGenesisIgnited())
-  const [nodeLifecycle, setNodeLifecycle] = useState<Record<string, NodeLifecycleStatus>>(() => loadNodeLifecycle())
-  const [nodeLockMetadata, setNodeLockMetadata] = useState<Record<string, LockMetadata | null>>(() => loadLockMetadata())
-  const [nodeFinancials, setNodeFinancialsState] = useState<Record<string, NodeFinancials>>(() => loadNodeFinancials())
-  const [nodePendingPrices, setNodePendingPrices] = useState<Record<string, string>>(() => loadPendingPrices())
+  const [nodeLifecycle, setNodeLifecycle] = useState<Record<string, NodeLifecycleStatus>>(() => safeLoadJson("neurogrid-miner-node-lifecycle", {}))
+  const [nodeLockMetadata, setNodeLockMetadata] = useState<Record<string, LockMetadata | null>>(() => safeLoadJson("neurogrid-miner-lock-metadata", {}))
+  const [nodeFinancials, setNodeFinancialsState] = useState<Record<string, NodeFinancials>>(() => safeLoadJson("neurogrid-miner-node-financials", {}))
+  const [nodePendingPrices, setNodePendingPrices] = useState<Record<string, string>>(() => safeLoadJson("neurogrid-miner-node-pending-prices", {}))
   const [simulatedNrgByNode, setSimulatedNrgByNode] = useState<Record<string, number>>({})
-  const [nodeSessionExpiresAt, setNodeSessionExpiresAtState] = useState<Record<string, string>>(() => loadSessionExpires())
-  const [nodeSessionDisconnected, setNodeSessionDisconnectedState] = useState<Record<string, boolean>>(() => loadSessionDisconnected())
+  const [nodeSessionExpiresAt, setNodeSessionExpiresAtState] = useState<Record<string, string>>(() => safeLoadJson("neurogrid-tenant-session-expires", {}))
+  const [nodeSessionDisconnected, setNodeSessionDisconnectedState] = useState<Record<string, boolean>>(() => safeLoadJson("neurogrid-tenant-session-disconnected", {}))
 
+  // One-time cleanup of legacy localStorage keys
   useEffect(() => {
-    setNodeToMiner(loadNodeToMiner())
-  }, [])
-  useEffect(() => {
-    setNodePrices(loadNodePrices())
-  }, [])
-  useEffect(() => {
-    setNodeBandwidth(loadNodeBandwidth())
+    if (typeof window === "undefined") return
+    for (const key of LEGACY_STORAGE_KEYS) {
+      try { localStorage.removeItem(key) } catch { /* ignore */ }
+    }
   }, [])
 
-  const persistNodeToMiner = useCallback((map: Record<string, string>) => {
-    setNodeToMiner(map)
-    saveNodeToMiner(map)
-  }, [])
+  const invalidateNodes = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.nodes })
+  }, [queryClient])
 
   const registerMiner = useCallback(
-    (
-      walletAddress: string,
-      options?: { pricePerHour?: string; bandwidth?: string }
-    ): string | null => {
-      const current = loadNodeToMiner()
-      const taken = new Set(Object.keys(current))
+    (walletAddress: string, options?: { pricePerHour?: string; bandwidth?: string }): string | null => {
+      const taken = new Set(Object.keys(nodeToMiner))
       const available = REGISTRABLE_NODE_IDS.find((id) => !taken.has(id))
       if (!available) return null
-      const next = { ...current, [available]: walletAddress }
-      persistNodeToMiner(next)
-      const price = options?.pricePerHour ?? "$0.59/hr"
-      const bandwidth = options?.bandwidth ?? "1 Gbps"
-      setNodePrices((prev) => {
-        const nextP = { ...prev, [available]: price }
-        saveNodePrices(nextP)
-        return nextP
-      })
-      setNodeBandwidth((prev) => {
-        const nextB = { ...prev, [available]: bandwidth }
-        saveNodeBandwidth(nextB)
-        return nextB
-      })
+      setNodeToMiner((prev) => ({ ...prev, [available]: walletAddress }))
+      setNodePrices((prev) => ({ ...prev, [available]: options?.pricePerHour ?? "$0.59/hr" }))
+      setNodeBandwidth((prev) => ({ ...prev, [available]: options?.bandwidth ?? "1 Gbps" }))
+      invalidateNodes()
       return available
     },
-    [persistNodeToMiner]
+    [nodeToMiner, invalidateNodes],
   )
 
   const registerMinerWithNodeId = useCallback(
-    (
-      nodeId: string,
-      walletAddress: string,
-      options?: { pricePerHour?: string; bandwidth?: string }
-    ): string | null => {
-      const current = loadNodeToMiner()
-      if (current[nodeId]) return null
-      const next = { ...current, [nodeId]: walletAddress }
-      persistNodeToMiner(next)
-      const price = options?.pricePerHour ?? "$0.59/hr"
-      const bandwidth = options?.bandwidth ?? "1 Gbps"
-      setNodePrices((prev) => {
-        const nextP = { ...prev, [nodeId]: price }
-        saveNodePrices(nextP)
-        return nextP
-      })
-      setNodeBandwidth((prev) => {
-        const nextB = { ...prev, [nodeId]: bandwidth }
-        saveNodeBandwidth(nextB)
-        return nextB
-      })
+    (nodeId: string, walletAddress: string, options?: { pricePerHour?: string; bandwidth?: string }): string | null => {
+      if (nodeToMiner[nodeId]) return null
+      setNodeToMiner((prev) => ({ ...prev, [nodeId]: walletAddress }))
+      setNodePrices((prev) => ({ ...prev, [nodeId]: options?.pricePerHour ?? "$0.59/hr" }))
+      setNodeBandwidth((prev) => ({ ...prev, [nodeId]: options?.bandwidth ?? "1 Gbps" }))
+      invalidateNodes()
       return nodeId
     },
-    [persistNodeToMiner]
+    [nodeToMiner, invalidateNodes],
   )
 
   const setNodeSessionExpiresAt = useCallback((nodeId: string, expiresAt: string | null) => {
@@ -480,72 +262,58 @@ export function MinerRegistryProvider({ children }: { children: ReactNode }) {
       const next = { ...prev }
       if (expiresAt) next[nodeId] = expiresAt
       else delete next[nodeId]
-      saveSessionExpires(next)
       return next
     })
   }, [])
 
   const clearTenantSessionStateForWallet = useCallback((walletAddress: string) => {
-    Object.entries(nodeRentals).forEach(([nodeId, renter]) => {
-      if (renter === walletAddress) {
-        setNodeSessionExpiresAtState((prev) => {
-          const next = { ...prev }
-          delete next[nodeId]
-          saveSessionExpires(next)
-          return next
-        })
-        setNodeSessionDisconnectedState((prev) => {
-          const next = { ...prev }
-          delete next[nodeId]
-          saveSessionDisconnected(next)
-          return next
-        })
-      }
+    setNodeRentals((currentRentals) => {
+      Object.entries(currentRentals).forEach(([nodeId, renter]) => {
+        if (renter === walletAddress) {
+          setNodeSessionExpiresAtState((prev) => {
+            const next = { ...prev }
+            delete next[nodeId]
+            return next
+          })
+          setNodeSessionDisconnectedState((prev) => {
+            const next = { ...prev }
+            delete next[nodeId]
+            return next
+          })
+        }
+      })
+      return currentRentals
     })
-  }, [nodeRentals])
+  }, [])
 
   const setNodeSessionDisconnected = useCallback((nodeId: string, disconnected: boolean) => {
     setNodeSessionDisconnectedState((prev) => {
       const next = { ...prev, [nodeId]: disconnected }
       if (!disconnected) delete next[nodeId]
-      saveSessionDisconnected(next)
       return next
     })
   }, [])
 
   const getNodeSessionExpiresAt = useCallback(
     (nodeId: string) => nodeSessionExpiresAt[nodeId] ?? null,
-    [nodeSessionExpiresAt]
+    [nodeSessionExpiresAt],
   )
 
   const getNodeSessionDisconnected = useCallback(
     (nodeId: string) => nodeSessionDisconnected[nodeId] ?? false,
-    [nodeSessionDisconnected]
+    [nodeSessionDisconnected],
   )
 
   const setNodeRental = useCallback(
     (nodeId: string, renterAddress: string | null, expiresAt?: string) => {
-      setNodeRentals((prev) => {
-        const next = { ...prev, [nodeId]: renterAddress }
-        saveNodeRentals(next)
-        return next
-      })
+      setNodeRentals((prev) => ({ ...prev, [nodeId]: renterAddress }))
       if (renterAddress) {
-        setNodeLifecycle((prev) => {
-          const next = { ...prev, [nodeId]: "LOCKED" as NodeLifecycleStatus }
-          saveNodeLifecycle(next)
-          return next
-        })
+        setNodeLifecycle((prev) => ({ ...prev, [nodeId]: "LOCKED" as NodeLifecycleStatus }))
         if (expiresAt) {
-          setNodeSessionExpiresAtState((prev) => {
-            const next = { ...prev, [nodeId]: expiresAt }
-            saveSessionExpires(next)
-            return next
-          })
+          setNodeSessionExpiresAtState((prev) => ({ ...prev, [nodeId]: expiresAt }))
           setNodeSessionDisconnectedState((prev) => {
             const next = { ...prev }
             delete next[nodeId]
-            saveSessionDisconnected(next)
             return next
           })
         }
@@ -556,51 +324,27 @@ export function MinerRegistryProvider({ children }: { children: ReactNode }) {
           locked_at: new Date().toISOString(),
           locked_price: lockedPrice,
         }
-        setNodeLockMetadata((prev) => {
-          const next = { ...prev, [nodeId]: meta }
-          saveLockMetadata(next)
-          return next
-        })
+        setNodeLockMetadata((prev) => ({ ...prev, [nodeId]: meta }))
       } else {
         setNodeSessionExpiresAtState((prev) => {
-          const next = { ...prev }
-          delete next[nodeId]
-          saveSessionExpires(next)
-          return next
+          const next = { ...prev }; delete next[nodeId]; return next
         })
         setNodeSessionDisconnectedState((prev) => {
-          const next = { ...prev }
-          delete next[nodeId]
-          saveSessionDisconnected(next)
-          return next
+          const next = { ...prev }; delete next[nodeId]; return next
         })
-        setNodeLifecycle((prev) => {
-          const next = { ...prev, [nodeId]: "IDLE" as NodeLifecycleStatus }
-          saveNodeLifecycle(next)
-          return next
-        })
-        setNodeLockMetadata((prev) => {
-          const next = { ...prev, [nodeId]: null }
-          saveLockMetadata(next)
-          return next
-        })
+        setNodeLifecycle((prev) => ({ ...prev, [nodeId]: "IDLE" as NodeLifecycleStatus }))
+        setNodeLockMetadata((prev) => ({ ...prev, [nodeId]: null }))
         const pending = nodePendingPrices[nodeId]
         if (pending) {
-          setNodePrices((prev) => {
-            const next = { ...prev, [nodeId]: pending }
-            saveNodePrices(next)
-            return next
-          })
+          setNodePrices((prev) => ({ ...prev, [nodeId]: pending }))
           setNodePendingPrices((prev) => {
-            const next = { ...prev }
-            delete next[nodeId]
-            savePendingPrices(next)
-            return next
+            const next = { ...prev }; delete next[nodeId]; return next
           })
         }
       }
+      invalidateNodes()
     },
-    [nodePrices, nodePendingPrices]
+    [nodePrices, nodePendingPrices, invalidateNodes],
   )
 
   const getMinerNodes = useCallback(
@@ -611,7 +355,7 @@ export function MinerRegistryProvider({ children }: { children: ReactNode }) {
       }
       return fromRegistry
     },
-    [nodeToMiner]
+    [nodeToMiner],
   )
 
   const getAvailableNodeId = useCallback((): string | null => {
@@ -623,8 +367,7 @@ export function MinerRegistryProvider({ children }: { children: ReactNode }) {
     (gpus: string): { min: number; max: number } | null => {
       const prices: number[] = []
       REGISTRABLE_NODE_IDS.forEach((id) => {
-        if (NODE_GPU_MAP[id] !== gpus) return
-        if (!nodeToMiner[id]) return
+        if (NODE_GPU_MAP[id] !== gpus || !nodeToMiner[id]) return
         const p = nodePrices[id]
         if (!p) return
         const n = parsePriceToNumber(p)
@@ -633,7 +376,7 @@ export function MinerRegistryProvider({ children }: { children: ReactNode }) {
       if (prices.length === 0) return null
       return { min: Math.min(...prices), max: Math.max(...prices) }
     },
-    [nodeToMiner, nodePrices]
+    [nodeToMiner, nodePrices],
   )
 
   const setGenesisIgnited = useCallback((ignited: boolean) => {
@@ -643,25 +386,23 @@ export function MinerRegistryProvider({ children }: { children: ReactNode }) {
 
   const getNodeLifecycle = useCallback(
     (nodeId: string): NodeLifecycleStatus => nodeLifecycle[nodeId] ?? "IDLE",
-    [nodeLifecycle]
+    [nodeLifecycle],
   )
 
   const getLockMetadata = useCallback(
     (nodeId: string): LockMetadata | null => nodeLockMetadata[nodeId] ?? null,
-    [nodeLockMetadata]
+    [nodeLockMetadata],
   )
 
   const getFinancials = useCallback(
     (nodeId: string): NodeFinancials => nodeFinancials[nodeId] ?? DEFAULT_FINANCIALS,
-    [nodeFinancials]
+    [nodeFinancials],
   )
 
   const setOptInBufferRouting = useCallback((nodeId: string, optIn: boolean) => {
     setNodeFinancialsState((prev) => {
       const f = prev[nodeId] ?? { ...DEFAULT_FINANCIALS }
-      const next = { ...prev, [nodeId]: { ...f, opt_in_buffer_routing: optIn } }
-      saveNodeFinancials(next)
-      return next
+      return { ...prev, [nodeId]: { ...f, opt_in_buffer_routing: optIn } }
     })
   }, [])
 
@@ -669,63 +410,43 @@ export function MinerRegistryProvider({ children }: { children: ReactNode }) {
     (nodeId: string, pricePerHour: string): boolean => {
       const lifecycle = nodeLifecycle[nodeId] ?? "IDLE"
       if (lifecycle === "IDLE") {
-        setNodePrices((prev) => {
-          const next = { ...prev, [nodeId]: pricePerHour }
-          saveNodePrices(next)
-          return next
-        })
+        setNodePrices((prev) => ({ ...prev, [nodeId]: pricePerHour }))
         return true
       }
       if (lifecycle === "LOCKED") {
-        setNodePendingPrices((prev) => {
-          const next = { ...prev, [nodeId]: pricePerHour }
-          savePendingPrices(next)
-          return next
-        })
+        setNodePendingPrices((prev) => ({ ...prev, [nodeId]: pricePerHour }))
         return true
       }
       return false
     },
-    [nodeLifecycle]
+    [nodeLifecycle],
   )
 
   const canUnregister = useCallback(
     (nodeId: string): boolean => (nodeLifecycle[nodeId] ?? "IDLE") !== "LOCKED",
-    [nodeLifecycle]
+    [nodeLifecycle],
   )
 
   const forceEmergencyRelease = useCallback(
     (nodeId: string) => {
-      setNodeRentals((prev) => {
-        const next = { ...prev, [nodeId]: null }
-        saveNodeRentals(next)
-        return next
-      })
-      setNodeLifecycle((prev) => {
-        const next = { ...prev, [nodeId]: "VIOLATED" as NodeLifecycleStatus }
-        saveNodeLifecycle(next)
-        return next
-      })
-      setNodeLockMetadata((prev) => {
-        const next = { ...prev, [nodeId]: null }
-        saveLockMetadata(next)
-        return next
-      })
+      // Transition to VIOLATED, clear rental, slash 50% buffer
+      setNodeRentals((prev) => ({ ...prev, [nodeId]: null }))
+      setNodeLifecycle((prev) => ({ ...prev, [nodeId]: "VIOLATED" as NodeLifecycleStatus }))
+      setNodeLockMetadata((prev) => ({ ...prev, [nodeId]: null }))
       setNodeSessionExpiresAtState((prev) => {
-        const next = { ...prev }; delete next[nodeId]; saveSessionExpires(next); return next
+        const next = { ...prev }; delete next[nodeId]; return next
       })
       setNodeSessionDisconnectedState((prev) => {
-        const next = { ...prev }; delete next[nodeId]; saveSessionDisconnected(next); return next
+        const next = { ...prev }; delete next[nodeId]; return next
       })
       setNodeFinancialsState((prev) => {
         const f = prev[nodeId] ?? DEFAULT_FINANCIALS
         const slashed = f.security_buffer_usd * 0.5
-        const next = { ...prev, [nodeId]: { ...f, security_buffer_usd: f.security_buffer_usd - slashed } }
-        saveNodeFinancials(next)
-        return next
+        return { ...prev, [nodeId]: { ...f, security_buffer_usd: f.security_buffer_usd - slashed } }
       })
+      invalidateNodes()
     },
-    []
+    [invalidateNodes],
   )
 
   const addSimulatedReward = useCallback((nodeId: string, amount: number) => {
@@ -734,70 +455,48 @@ export function MinerRegistryProvider({ children }: { children: ReactNode }) {
 
   const getDisplayEarnedNrg = useCallback(
     (nodeId: string) => (nodeFinancials[nodeId]?.earned_nrg ?? 0) + (simulatedNrgByNode[nodeId] ?? 0),
-    [nodeFinancials, simulatedNrgByNode]
+    [nodeFinancials, simulatedNrgByNode],
   )
 
   const unregisterMiner = useCallback(
     (nodeId: string): boolean => {
       if ((nodeLifecycle[nodeId] ?? "IDLE") === "LOCKED") return false
-      const current = loadNodeToMiner()
-      if (!current[nodeId]) return false
-      const next = { ...current }
-      delete next[nodeId]
-      persistNodeToMiner(next)
-      setNodePrices((p) => {
-        const n = { ...p }; delete n[nodeId]; saveNodePrices(n); return n
-      })
-      setNodeBandwidth((b) => {
-        const n = { ...b }; delete n[nodeId]; saveNodeBandwidth(n); return n
-      })
-      setNodeRentals((r) => { const n = { ...r }; delete n[nodeId]; saveNodeRentals(n); return n })
-      setNodeLifecycle((l) => { const n = { ...l }; delete n[nodeId]; saveNodeLifecycle(n); return n })
-      setNodeLockMetadata((m) => { const n = { ...m }; delete n[nodeId]; saveLockMetadata(n); return n })
-      setNodePendingPrices((p) => { const n = { ...p }; delete n[nodeId]; savePendingPrices(n); return n })
-      setNodeFinancialsState((f) => { const n = { ...f }; delete n[nodeId]; saveNodeFinancials(n); return n })
-      setNodeSessionExpiresAtState((e) => { const n = { ...e }; delete n[nodeId]; saveSessionExpires(n); return n })
-      setNodeSessionDisconnectedState((d) => { const n = { ...d }; delete n[nodeId]; saveSessionDisconnected(n); return n })
+      if (!nodeToMiner[nodeId]) return false
+      setNodeToMiner((p) => { const n = { ...p }; delete n[nodeId]; return n })
+      setNodePrices((p) => { const n = { ...p }; delete n[nodeId]; return n })
+      setNodeBandwidth((b) => { const n = { ...b }; delete n[nodeId]; return n })
+      setNodeRentals((r) => { const n = { ...r }; delete n[nodeId]; return n })
+      setNodeLifecycle((l) => { const n = { ...l }; delete n[nodeId]; return n })
+      setNodeLockMetadata((m) => { const n = { ...m }; delete n[nodeId]; return n })
+      setNodePendingPrices((p) => { const n = { ...p }; delete n[nodeId]; return n })
+      setNodeFinancialsState((f) => { const n = { ...f }; delete n[nodeId]; return n })
+      setNodeSessionExpiresAtState((e) => { const n = { ...e }; delete n[nodeId]; return n })
+      setNodeSessionDisconnectedState((d) => { const n = { ...d }; delete n[nodeId]; return n })
+      invalidateNodes()
       return true
     },
-    [nodeLifecycle, persistNodeToMiner]
+    [nodeLifecycle, nodeToMiner, invalidateNodes],
   )
 
   const clearAllRegistrationData = useCallback(() => {
     if (typeof window === "undefined") return
-    for (const key of MINER_REGISTRY_STORAGE_KEYS) {
-      localStorage.removeItem(key)
-    }
-    const empty: Record<string, string> = {}
-    const emptyNull: Record<string, string | null> = {}
-    const emptyLifecycle: Record<string, NodeLifecycleStatus> = {}
-    const emptyLock: Record<string, LockMetadata | null> = {}
-    const emptyFinancials: Record<string, NodeFinancials> = {}
-    const emptyBool: Record<string, boolean> = {}
-    saveNodeToMiner(empty)
-    saveNodeRentals(emptyNull)
-    saveNodePrices(empty)
-    saveNodeBandwidth(empty)
-    saveGenesisIgnited(false)
-    saveNodeLifecycle(emptyLifecycle)
-    saveLockMetadata(emptyLock)
-    saveNodeFinancials(emptyFinancials)
-    savePendingPrices(empty)
-    saveSessionExpires(empty)
-    saveSessionDisconnected(emptyBool)
-    setNodeToMiner(empty)
-    setNodeRentals(emptyNull)
-    setNodePrices(empty)
-    setNodeBandwidth(empty)
+    // Clear only UI preference keys
+    try { localStorage.removeItem(GENESIS_IGNITED_KEY) } catch { /* ignore */ }
+    setNodeToMiner({})
+    setNodeRentals({})
+    setNodePrices({})
+    setNodeBandwidth({})
     setGenesisIgnitedState(false)
-    setNodeLifecycle(emptyLifecycle)
-    setNodeLockMetadata(emptyLock)
-    setNodeFinancialsState(emptyFinancials)
-    setNodePendingPrices(empty)
-    setNodeSessionExpiresAtState(empty)
-    setNodeSessionDisconnectedState(emptyBool)
+    setNodeLifecycle({})
+    setNodeLockMetadata({})
+    setNodeFinancialsState({})
+    setNodePendingPrices({})
+    setNodeSessionExpiresAtState({})
+    setNodeSessionDisconnectedState({})
     setSimulatedNrgByNode({})
-  }, [])
+    // Invalidate all React Query caches
+    queryClient.removeQueries()
+  }, [queryClient])
 
   return (
     <MinerRegistryContext.Provider

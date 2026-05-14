@@ -57,12 +57,20 @@ export function Navbar() {
   }
   const switchToTenant = () => setRole("tenant")
 
+  // Route guard: sync role only when navigating to role-specific pages.
+  // Using a ref to avoid re-running on address/function identity changes.
+  const prevPathRef = useState<string | null>(null)
   useEffect(() => {
+    if (pathname === prevPathRef[0]) return
+    prevPathRef[1](pathname)
     if (pathname === "/miner") {
       if (address) clearTenantSessionStateForWallet(address)
       setRole("miner")
-    } else if (pathname === "/nodes") setRole("tenant")
-  }, [pathname, setRole, address, clearTenantSessionStateForWallet])
+    } else if (pathname === "/nodes") {
+      setRole("tenant")
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname])
 
   const openAuthAs = (mode: AuthModalMode) => {
     setAuthModalMode(mode)

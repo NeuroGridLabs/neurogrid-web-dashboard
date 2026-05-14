@@ -236,16 +236,18 @@ export default function NodesPage() {
             <p className="text-xs font-medium" style={{ color: "rgba(255,200,0,0.95)" }}>
               Epoch 0: Network Ignition Pending.
             </p>
-            <a
-              href={process.env.NEXT_PUBLIC_GENESIS_WAITLIST_URL || "https://discord.gg"}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 border px-3 py-1.5 text-xs font-bold uppercase tracking-wider transition-colors hover:opacity-90"
-              style={{ borderColor: "#00FF41", color: "#00FF41" }}
-            >
-              <span aria-hidden>🔒</span>
-              Apply for Genesis Whitelist
-            </a>
+            {process.env.NEXT_PUBLIC_GENESIS_WAITLIST_URL && (
+              <a
+                href={process.env.NEXT_PUBLIC_GENESIS_WAITLIST_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 border px-3 py-1.5 text-xs font-bold uppercase tracking-wider transition-colors hover:opacity-90"
+                style={{ borderColor: "#00FF41", color: "#00FF41" }}
+              >
+                <span aria-hidden>🔒</span>
+                Apply for Genesis Whitelist
+              </a>
+            )}
           </div>
         </div>
 

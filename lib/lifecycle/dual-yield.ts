@@ -21,36 +21,16 @@ export function bufferCapUsd(hourlyPriceUsd: number): number {
 }
 
 /**
- * From an order profit (95% of hourly price per hour, or single order amount):
- * 10% goes to Security Buffer until buffer reaches cap; rest to Free Balance.
+ * Base requirement: always deduct 10% from every order until buffer reaches cap.
+ * After cap, if opt-in, keep routing 10% to buffer; else all to free.
  */
 export function allocateOrderProfit(
   orderProfitUsd: number,
   currentBufferUsd: number,
-  bufferCapUsd: number,
+  bufferCap: number,
   optInBufferRouting: boolean
 ): { toFreeUsd: number; toBufferUsd: number } {
-  const toBufferRate = optInBufferRouting ? SECURITY_BUFFER_RATE : 0
-  const headroom = Math.max(0, bufferCapUsd - currentBufferUsd)
-  const toBufferUsd = Math.min(
-    headroom,
-    orderProfitUsd * (currentBufferUsd < bufferCapUsd ? SECURITY_BUFFER_RATE : toBufferRate)
-  )
-  const toFreeUsd = orderProfitUsd - toBufferUsd
-  return { toFreeUsd, toBufferUsd }
-}
-
-/**
- * Base requirement: always deduct 10% from every order until buffer reaches cap.
- * After cap, if opt-in, keep routing 10% to buffer; else all to free.
- */
-export function allocateOrderProfitStrict(
-  orderProfitUsd: number,
-  currentBufferUsd: number,
-  bufferCapUsd: number,
-  optInBufferRouting: boolean
-): { toFreeUsd: number; toBufferUsd: number } {
-  const needMore = Math.max(0, bufferCapUsd - currentBufferUsd)
+  const needMore = Math.max(0, bufferCap - currentBufferUsd)
   const mandatoryBuffer = Math.min(needMore, orderProfitUsd * SECURITY_BUFFER_RATE)
   const remaining = orderProfitUsd - mandatoryBuffer
   const optionalBuffer = optInBufferRouting
@@ -66,36 +46,38 @@ export function allocateOrderProfitStrict(
  */
 export function canWithdrawBuffer(
   nodeRegistered: boolean,
-  unregisteredAt: string | null
+  unregisteredAt: string | null,
+  now: Date = new Date()
 ): boolean {
   if (nodeRegistered || !unregisteredAt) return false
   const cooldownEnd = new Date(unregisteredAt)
   cooldownEnd.setDate(cooldownEnd.getDate() + SECURITY_BUFFER_COOLDOWN_DAYS)
-  return new Date() >= cooldownEnd
+  return now >= cooldownEnd
 }
 
 /**
  * APY tier by days (since lock or since first deposit for buffer).
+ * Tier boundaries: daysMax is exclusive (e.g. 0–30 means day 0 to 30 inclusive, day 31 enters next tier).
  */
 function getApyForDays(
   daysHeld: number,
   tiers: readonly { daysMin: number; daysMax: number; apy: number }[]
 ): number {
   for (const t of tiers) {
-    if (daysHeld >= t.daysMin && daysHeld <= t.daysMax) return t.apy
+    if (daysHeld >= t.daysMin && daysHeld < t.daysMax) return t.apy
   }
   return tiers[tiers.length - 1]?.apy ?? 0
 }
 
 /**
- * POOL A: Free Balance APY (0–30d 0.3%, 31–90d 0.8%, 90+d 1.5%).
+ * POOL A: Free Balance APY (0–30d 0.3%, 31–89d 0.8%, 90+d 1.5%).
  */
 export function poolApyFree(daysHeld: number): number {
   return getApyForDays(daysHeld, POOL_A_APY_TIERS)
 }
 
 /**
- * POOL B: Security Buffer APY (0–30d 0.3%, 31–90d 1.0%, 90+d 3.0%).
+ * POOL B: Security Buffer APY (0–30d 0.3%, 31–89d 1.0%, 90+d 3.0%).
  */
 export function poolApyBuffer(daysHeld: number): number {
   return getApyForDays(daysHeld, POOL_B_APY_TIERS)
@@ -103,6 +85,7 @@ export function poolApyBuffer(daysHeld: number): number {
 
 /**
  * Accrued interest (simplified: principal * apy * (days/365)).
+ * Rounded to 6 decimal places to match USDT precision.
  */
 export function accruedInterestUsd(
   principalUsd: number,
@@ -110,7 +93,7 @@ export function accruedInterestUsd(
   daysHeld: number
 ): number {
   if (principalUsd <= 0 || daysHeld <= 0) return 0
-  return principalUsd * apy * (daysHeld / 365)
+  return Math.round(principalUsd * apy * (daysHeld / 365) * 1e6) / 1e6
 }
 
 /**

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { KeyRound, Download, Copy, AlertTriangle } from "lucide-react"
 import { GpuBar } from "@/components/atoms/gpu-bar"
 import {
@@ -33,11 +33,18 @@ function ConnectionDetailsModal({
   const [copied, setCopied] = useState(false)
   const [clientDownloaded, setClientDownloaded] = useState(false)
 
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    return () => { if (copyTimerRef.current) clearTimeout(copyTimerRef.current) }
+  }, [])
+
   const handleCopySessionKey = async () => {
     try {
       await navigator.clipboard.writeText(sessionKey)
       setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current)
+      copyTimerRef.current = setTimeout(() => setCopied(false), 2000)
     } catch {
       // fallback
     }
@@ -171,6 +178,26 @@ function formatCountdown(expiresAtIso: string): { text: string; remainingMs: num
   return { text, remainingMs }
 }
 
+function ReclaimCountdown({ expiresAt }: { expiresAt: string }) {
+  const countdown = formatCountdown(expiresAt)
+  return (
+    <div className="flex min-w-0 flex-col gap-0.5">
+      <span className="text-[10px] font-medium" style={{ color: "rgba(255,200,0,0.95)" }} title={expiresAt}>
+        Reclaim in {countdown.text}
+      </span>
+      <span className="text-[9px]" style={{ color: "rgba(0,255,255,0.6)" }}>
+        {new Date(expiresAt).toLocaleString("en-US", { dateStyle: "short", timeStyle: "short" })} reclaim
+      </span>
+      {countdown.remainingMs > 0 && countdown.remainingMs < RENEWAL_WARNING_MINUTES * 60 * 1000 && (
+        <span className="inline-flex items-center gap-1 text-[9px] font-medium" style={{ color: "#ff9800" }}>
+          <AlertTriangle className="h-3 w-3 shrink-0" />
+          Renew within 30 min or the instance will be reclaimed
+        </span>
+      )}
+    </div>
+  )
+}
+
 export function RentedNodesPanel({ walletAddress, rentedNodes, onUndeploy, onRedeploy }: RentedNodesPanelProps) {
   const [credentialNode, setCredentialNode] = useState<RentedNodeSnapshot | null>(null)
   const [tick, setTick] = useState(0)
@@ -231,20 +258,7 @@ export function RentedNodesPanel({ walletAddress, rentedNodes, onUndeploy, onRed
                     {node.name}
                   </span>
                   {node.disconnected && node.expires_at ? (
-                    <div className="flex min-w-0 flex-col gap-0.5">
-                      <span className="text-[10px] font-medium" style={{ color: "rgba(255,200,0,0.95)" }} title={node.expires_at}>
-                        Reclaim in {formatCountdown(node.expires_at).text}
-                      </span>
-                      <span className="text-[9px]" style={{ color: "rgba(0,255,255,0.6)" }}>
-                        {new Date(node.expires_at).toLocaleString("en-US", { dateStyle: "short", timeStyle: "short" })} reclaim
-                      </span>
-                      {formatCountdown(node.expires_at).remainingMs > 0 && formatCountdown(node.expires_at).remainingMs < RENEWAL_WARNING_MINUTES * 60 * 1000 && (
-                        <span className="inline-flex items-center gap-1 text-[9px] font-medium" style={{ color: "#ff9800" }}>
-                          <AlertTriangle className="h-3 w-3 shrink-0" />
-                          Renew within 30 min or the instance will be reclaimed
-                        </span>
-                      )}
-                    </div>
+                    <ReclaimCountdown expiresAt={node.expires_at} />
                   ) : (
                     <>
                       <div className="flex items-center gap-1 overflow-hidden">

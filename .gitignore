@@ -38,6 +38,10 @@ mnemonic*.txt
 !vercel.json
 !jsconfig.json
 !tsconfig*.json
+!lib/onchain/*.idl.json
+
+# TypeScript build artifacts
+*.tsbuildinfo
 
 # IDE & OS
 .DS_Store
@@ -55,3 +59,4 @@ v0-project.code-workspace
 __v0_runtime_loader.js
 __v0_devtools.tsx
 __v0_jsx-dev-runtime.ts
+.env*.local

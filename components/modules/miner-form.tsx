@@ -33,17 +33,20 @@ export function MinerForm({ priceRange, gpuTypeLabel = "Same type", canRegister 
   const [bandwidth, setBandwidth] = useState("")
   const [fingerprintReady, setFingerprintReady] = useState(false)
   const [tunnelVerified, setTunnelVerified] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
 
   const handleFingerprint = () => {
     setFingerprintReady(true)
   }
 
-  const canSubmit = canRegister && fingerprintReady
+  const canSubmit = canRegister && fingerprintReady && !submitting
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!canSubmit) return
+    setSubmitting(true)
     const priceStr = `$${price.toFixed(2)}/hr`
+    try {
     onSubmit?.({
       pricePerHour: priceStr,
       bandwidth: bandwidth.trim() || "1 Gbps",
@@ -52,6 +55,9 @@ export function MinerForm({ priceRange, gpuTypeLabel = "Same type", canRegister 
       gateway: gateway.trim() || undefined,
       tunnelVerified: tunnelVerified || undefined,
     })
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -146,7 +152,8 @@ export function MinerForm({ priceRange, gpuTypeLabel = "Same type", canRegister 
               style={{ backgroundColor: "#00FF41", boxShadow: "0 0 4px #00FF41" }}
             />
             <span className="text-xs" style={{ color: "#00FF41" }}>
-              Fingerprint captured: 0x7f3a...b291
+              {/* MOCK:Epoch0 — real fingerprint from NeuroClient hardware attestation */}
+              Fingerprint: pending verification
             </span>
           </div>
         ) : (
@@ -174,7 +181,7 @@ export function MinerForm({ priceRange, gpuTypeLabel = "Same type", canRegister 
           accentColor="#00FFFF"
           disabled={!canSubmit}
         >
-          Register Miner
+          {submitting ? "Registering…" : "Register Miner"}
         </NeonButton>
         <NeonButton type="button" variant="secondary" accentColor="#00FF41">
           Start PoI Challenge

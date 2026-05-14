@@ -1,18 +1,28 @@
-import { fetchTreasuryData } from "@/lib/treasury-api"
+import { fetchTreasuryData, invalidateTreasuryCache } from "@/lib/treasury-api"
 import { NextResponse } from "next/server"
 
 export const dynamic = "force-dynamic"
 export const revalidate = 60
 
+/**
+ * GET: Fetch treasury data with error grading and stale-cache support.
+ * Query: refresh=1 invalidates cache and forces re-fetch.
+ */
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
-    const skipCache = process.env.NODE_ENV === "development" && searchParams.get("refresh") === "1"
-    console.log("[Treasury API] Fetching treasury data...", skipCache ? "(cache bypass)" : "")
-    const data = await fetchTreasuryData(skipCache)
-    if (data.totalReserveUsd === 0) {
+    const forceRefresh = searchParams.get("refresh") === "1"
+
+    if (forceRefresh) {
+      invalidateTreasuryCache()
+    }
+
+    const data = await fetchTreasuryData(forceRefresh)
+
+    if (data.totalReserveUsd === 0 && !data.isStale) {
       console.log("[Treasury API] Serving Epoch 0 treasury data (no reserve yet)")
     }
+
     return NextResponse.json(data)
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Unknown error"

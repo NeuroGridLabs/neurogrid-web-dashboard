@@ -9,11 +9,10 @@ import {
 } from "@solana/web3.js"
 import {
   getAssociatedTokenAddressSync,
-  createAssociatedTokenAccountInstruction,
-  createTransferInstruction,
   TOKEN_PROGRAM_ID,
   ASSOCIATED_TOKEN_PROGRAM_ID,
 } from "@solana/spl-token"
+import { buildCreateEscrowIxs } from "@/lib/onchain"
 import { StatusBadge, type BadgeStatus } from "@/components/atoms/status-badge"
 import { GpuBar } from "@/components/atoms/gpu-bar"
 import {
@@ -414,7 +413,7 @@ export function NodeCluster({
             transactionSignature: "genesis-ignite",
           }),
         })
-        const data = await assignRes.json().catch(() => ({})) as { error?: string; code?: string; gateway?: string; port?: number; session_key?: string }
+        const data = await assignRes.json().catch(() => ({})) as { error?: string; code?: string; gateway?: string; port?: number; session_key?: string; expires_at?: string; status?: string; session_id?: string; escrow_breakdown?: Record<string, unknown> }
         if (assignRes.status === 409) {
           setGenesisIgnited(true)
           toast.success("Alpha-01 is already ignited.")
@@ -451,14 +450,15 @@ export function NodeCluster({
     }
 
     setDeployTxPending(true)
-    const toastId = toast.loading("Processing Web3 Payment...")
+    const toastId = toast.loading("Building on-chain escrow...")
 
     try {
-      // 95/5 split: minerAmount = X * 0.95, treasuryAmount = X * 0.05 (raw = X * 10^6, Math.floor)
-      const totalRaw = usdtToRaw(X)
-      const minerRaw = BigInt(Math.floor(Number(totalRaw) * 0.95))
-      const treasuryRaw = totalRaw - minerRaw
+      const expectedHours = 1
+      const hourlyPriceUsd = node.priceInUSDT ?? 0.59
+      const hourlyPriceRaw = BigInt(Math.floor(hourlyPriceUsd * 1_000_000))
+      const totalRaw = hourlyPriceRaw * BigInt(expectedHours)
 
+      // Balance precheck (still useful UX — fail fast vs onchain revert)
       const payerATA = getAssociatedTokenAddressSync(
         usdtMint,
         publicKey,
@@ -466,21 +466,6 @@ export function NodeCluster({
         TOKEN_PROGRAM_ID,
         ASSOCIATED_TOKEN_PROGRAM_ID
       )
-      const minerATA = getAssociatedTokenAddressSync(
-        usdtMint,
-        new PublicKey(node.minerWalletAddress),
-        false,
-        TOKEN_PROGRAM_ID,
-        ASSOCIATED_TOKEN_PROGRAM_ID
-      )
-      const treasuryATA = getAssociatedTokenAddressSync(
-        usdtMint,
-        treasuryPubkey,
-        false,
-        TOKEN_PROGRAM_ID,
-        ASSOCIATED_TOKEN_PROGRAM_ID
-      )
-
       let balance = BigInt(0)
       try {
         const r = await connection.getTokenAccountBalance(payerATA)
@@ -498,59 +483,39 @@ export function NodeCluster({
         return
       }
 
-      const tx = new Transaction()
-
-      const minerAccountInfo = await connection.getAccountInfo(minerATA)
-      if (!minerAccountInfo) {
-        tx.add(
-          createAssociatedTokenAccountInstruction(
-            publicKey,
-            minerATA,
-            new PublicKey(node.minerWalletAddress),
-            usdtMint,
-            TOKEN_PROGRAM_ID,
-            ASSOCIATED_TOKEN_PROGRAM_ID
-          )
-        )
-      }
-      const treasuryAccountInfo = await connection.getAccountInfo(treasuryATA)
-      if (!treasuryAccountInfo) {
-        tx.add(
-          createAssociatedTokenAccountInstruction(
-            publicKey,
-            treasuryATA,
-            treasuryPubkey,
-            usdtMint,
-            TOKEN_PROGRAM_ID,
-            ASSOCIATED_TOKEN_PROGRAM_ID
-          )
-        )
+      // Generate fresh session_id as UUID v4 (will be both DB id AND on-chain session_id bytes)
+      const sessionUuid = crypto.randomUUID()
+      const sessionIdHex = sessionUuid.replace(/-/g, "")
+      const sessionIdBytes = new Uint8Array(16)
+      for (let i = 0; i < 16; i++) {
+        sessionIdBytes[i] = parseInt(sessionIdHex.slice(i * 2, i * 2 + 2), 16)
       }
 
-      tx.add(
-        createTransferInstruction(
-          payerATA,
-          minerATA,
-          publicKey,
-          minerRaw,
-          [],
-          TOKEN_PROGRAM_ID
-        ),
-        createTransferInstruction(
-          payerATA,
-          treasuryATA,
-          publicKey,
-          treasuryRaw,
-          [],
-          TOKEN_PROGRAM_ID
-        )
+      const nodeIdBytes = new Uint8Array(
+        await crypto.subtle.digest("SHA-256", new TextEncoder().encode(node.id)),
       )
 
+      // Build the 3 IXs: createTreasuryAta + createEscrowAta + create_escrow
+      const ixs = await buildCreateEscrowIxs({
+        tenant: publicKey,
+        miner: new PublicKey(node.minerWalletAddress),
+        sessionId: sessionIdBytes,
+        expectedHours,
+        hourlyPriceRaw,
+        nodeId: nodeIdBytes,
+      })
+
+      const { blockhash } = await connection.getLatestBlockhash()
+      const tx = new Transaction()
+      tx.add(...ixs)
+      tx.recentBlockhash = blockhash
+      tx.feePayer = publicKey
+
+      toast.loading("Awaiting wallet signature...", { id: toastId })
       const sig = await sendTransaction(tx, connection, { skipPreflight: false })
+      toast.loading("Confirming on Solana...", { id: toastId })
       await connection.confirmTransaction(sig, "confirmed")
 
-      const expectedHours = 1
-      const hourlyPriceUsd = node.priceInUSDT ?? 0.59
       const assignRes = await fetch("/api/deploy/assign", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -558,6 +523,7 @@ export function NodeCluster({
           nodeId: node.id,
           renterWalletAddress: publicKey.toBase58(),
           transactionSignature: sig,
+          sessionIdHex,
           expected_hours: expectedHours,
           hourly_price_usd: hourlyPriceUsd,
         }),
@@ -566,11 +532,16 @@ export function NodeCluster({
         const errBody = await assignRes.text()
         throw new Error(errBody || "Assign failed")
       }
-      const assignData = (await assignRes.json()) as { gateway: string; port: number; session_key?: string; escrow_breakdown?: { expires_at: string }; expires_at?: string }
-      const { gateway, port, session_key } = assignData
-      const isRedeploy = getNodeSessionDisconnected(node.id)
+      const assignData = (await assignRes.json()) as { gateway?: string; port?: number; session_key?: string; escrow_breakdown?: { expires_at: string }; expires_at?: string }
+      if (!assignData?.gateway || typeof assignData.port !== "number") {
+        throw new Error("Invalid deploy response: missing gateway/port")
+      }
+      const { gateway, port, session_key } = assignData as { gateway: string; port: number; session_key?: string }
+      const storedExpiresAt = getNodeSessionExpiresAt(node.id)
+      const storedIsExpired = storedExpiresAt ? new Date(storedExpiresAt).getTime() <= Date.now() : false
+      const isRedeploy = getNodeSessionDisconnected(node.id) && !storedIsExpired
       const expiresAt = isRedeploy
-        ? (getNodeSessionExpiresAt(node.id) ?? assignData.expires_at ?? assignData.escrow_breakdown?.expires_at)
+        ? (storedExpiresAt ?? assignData.expires_at ?? assignData.escrow_breakdown?.expires_at)
         : (assignData.expires_at ?? assignData.escrow_breakdown?.expires_at)
 
       setModalPhase("in_progress")
@@ -790,12 +761,13 @@ export function NodeCluster({
                 )}
                 <span className="inline-flex items-center gap-1.5">
                   {(node.status === "LOCKED" || node.lifecycleStatus === "LOCKED") && (
-                    <LockKeyhole
-                      className="h-3.5 w-3.5 shrink-0"
-                      style={{ color: "#ffa500" }}
-                      aria-label="Locked"
-                      title="Node locked — tenant pays locked price until undeploy"
-                    />
+                    <span title="Node locked — tenant pays locked price until undeploy">
+                      <LockKeyhole
+                        className="h-3.5 w-3.5 shrink-0"
+                        style={{ color: "#ffa500" }}
+                        aria-label="Locked"
+                      />
+                    </span>
                   )}
                   <StatusBadge status={node.status} />
                 </span>
@@ -1170,15 +1142,17 @@ export function NodeCluster({
           <p className="text-xs" style={{ color: "rgba(0,255,255,0.7)" }}>
             Alpha-01 is the Foundation Seed Node. Access is whitelist-only until Genesis ignition. Join the waitlist to be notified.
           </p>
-          <a
-            href={process.env.NEXT_PUBLIC_GENESIS_WAITLIST_URL || "https://discord.gg"}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex justify-center border px-4 py-2 text-xs font-bold uppercase tracking-wider transition-colors hover:opacity-90"
-            style={{ borderColor: "#00FFFF", color: "#00FFFF" }}
-          >
-            Join Genesis Waitlist
-          </a>
+          {process.env.NEXT_PUBLIC_GENESIS_WAITLIST_URL && (
+            <a
+              href={process.env.NEXT_PUBLIC_GENESIS_WAITLIST_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex justify-center border px-4 py-2 text-xs font-bold uppercase tracking-wider transition-colors hover:opacity-90"
+              style={{ borderColor: "#00FFFF", color: "#00FFFF" }}
+            >
+              Join Genesis Waitlist
+            </a>
+          )}
           <button
             type="button"
             onClick={() => setGenesisComingSoonOpen(false)}

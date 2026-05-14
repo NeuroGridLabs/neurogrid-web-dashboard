@@ -6,12 +6,16 @@ import {
   useEffect,
   useState,
   useCallback,
+  useRef,
   type ReactNode,
 } from "react"
+import { useQueryClient } from "@tanstack/react-query"
 import { useWallet } from "@/lib/contexts/wallet-context"
+import { toast } from "sonner"
 
 export type AuthMethod = "wallet" | "web2" | null
 
+/** UI preference — stays in localStorage */
 const AUTH_METHOD_KEY = "neurogrid-auth-method"
 
 function loadAuthMethod(): AuthMethod {
@@ -36,21 +40,23 @@ function saveAuthMethod(method: AuthMethod) {
 }
 
 interface AuthContextValue {
-  /** How the user authenticated: wallet (Web3) or web2 (email/social). Null when disconnected. */
   authMethod: AuthMethod
-  /** Set authMethod to 'web2' when Web2 login succeeds. Wallet connect is synced automatically. */
   setAuthMethod: (method: AuthMethod) => void
-  /** True if user can access both Miner and Tenant views (wallet-only). */
   canSwitchRole: boolean
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
-/** Must be used inside WalletProvider. Syncs authMethod from wallet: connected => 'wallet', disconnected => null. */
+/** JWT auto-refresh interval: check every 5 minutes */
+const REFRESH_CHECK_INTERVAL = 5 * 60 * 1000
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { isConnected } = useWallet()
+  const queryClient = useQueryClient()
   const [authMethod, setAuthMethodState] = useState<AuthMethod>(() => loadAuthMethod())
+  const refreshTimer = useRef<ReturnType<typeof setInterval> | null>(null)
 
+  // Wallet connect/disconnect sync
   useEffect(() => {
     if (isConnected) {
       setAuthMethodState("wallet")
@@ -59,11 +65,57 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ authMethod: "wallet" }),
-      }).catch(() => {})
+      }).catch((e) => {
+        toast.error("Failed to sync auth session", {
+          description: e instanceof Error ? e.message : "Network error",
+        })
+      })
     } else {
+      // C-FE-01: Full cleanup on disconnect
       setAuthMethodState(null)
       saveAuthMethod(null)
-      fetch("/api/auth/session", { method: "DELETE" }).catch(() => {})
+
+      // Clear JWT cookie via server
+      fetch("/api/auth/session", { method: "DELETE" }).catch((e) => {
+        toast.error("Failed to clear session", {
+          description: e instanceof Error ? e.message : "Network error",
+        })
+      })
+
+      // Clear all React Query caches
+      queryClient.removeQueries()
+
+      // Stop JWT refresh timer
+      if (refreshTimer.current) {
+        clearInterval(refreshTimer.current)
+        refreshTimer.current = null
+      }
+    }
+  }, [isConnected, queryClient])
+
+  // JWT auto-refresh: check periodically, refresh if expiring within 1 hour
+  useEffect(() => {
+    if (!isConnected) return
+
+    const checkAndRefresh = async () => {
+      try {
+        const res = await fetch("/api/auth/refresh", { method: "POST" })
+        if (!res.ok && res.status === 401) {
+          // JWT expired completely — user needs to reconnect
+          toast.warning("Session expired. Please reconnect your wallet.")
+        }
+      } catch {
+        // Network error — silent, will retry next interval
+      }
+    }
+
+    refreshTimer.current = setInterval(checkAndRefresh, REFRESH_CHECK_INTERVAL)
+
+    return () => {
+      if (refreshTimer.current) {
+        clearInterval(refreshTimer.current)
+        refreshTimer.current = null
+      }
     }
   }, [isConnected])
 

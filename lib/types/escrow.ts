@@ -52,9 +52,6 @@ export const ANTI_CHURN_MIN_HOURS = 1
 export const PLATFORM_FEE_BPS = 500 // 5.00%
 export const PLATFORM_FEE_RATE = 0.05
 
-/** Miner share of each order (95% before buffer deduction). */
-export const MINER_ORDER_SHARE = 0.95
-
 /** Security buffer: 10% of order until cap. */
 export const SECURITY_BUFFER_RATE = 0.1
 /** Cap = 100 * hourly_price (per node). */
@@ -63,16 +60,16 @@ export const SECURITY_BUFFER_HOURS_MULTIPLIER = 100
 /** Withdraw Security Buffer only when node UNREGISTERED + this cooldown (days). */
 export const SECURITY_BUFFER_COOLDOWN_DAYS = 7
 
-/** POOL A: Free Balance (profits) — graduated APY (annual). */
+/** POOL A: Free Balance (profits) — graduated APY (annual). daysMax is exclusive. */
 export const POOL_A_APY_TIERS = [
-  { daysMin: 0, daysMax: 30, apy: 0.003 },
+  { daysMin: 0, daysMax: 31, apy: 0.003 },
   { daysMin: 31, daysMax: 90, apy: 0.008 },
   { daysMin: 90, daysMax: Infinity, apy: 0.015 },
 ] as const
 
-/** POOL B: Security Buffer (locked) — graduated APY. */
+/** POOL B: Security Buffer (locked) — graduated APY. daysMax is exclusive. */
 export const POOL_B_APY_TIERS = [
-  { daysMin: 0, daysMax: 30, apy: 0.003 },
+  { daysMin: 0, daysMax: 31, apy: 0.003 },
   { daysMin: 31, daysMax: 90, apy: 0.01 },
   { daysMin: 90, daysMax: Infinity, apy: 0.03 },
 ] as const

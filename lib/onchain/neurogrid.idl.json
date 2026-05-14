@@ -1,0 +1,1455 @@
+{
+  "address": "CtqZMVcFxuQ6bsHi3xgaPPdopmEAgHRFivW3rCbCPse6",
+  "metadata": {
+    "name": "neurogrid",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "NeuroGrid Protocol — Escrow, Registry, Treasury on Solana"
+  },
+  "instructions": [
+    {
+      "name": "create_escrow",
+      "docs": [
+        "Create escrow: tenant locks USDT. 5% fee → treasury, 95% → escrow PDA."
+      ],
+      "discriminator": [
+        253,
+        215,
+        165,
+        116,
+        36,
+        108,
+        68,
+        80
+      ],
+      "accounts": [
+        {
+          "name": "tenant",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "escrow",
+          "docs": [
+            "Escrow state account (PDA)"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "session_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "escrow_token",
+          "docs": [
+            "Escrow token account (PDA-owned, holds the 95% USDT)"
+          ],
+          "writable": true
+        },
+        {
+          "name": "tenant_token",
+          "docs": [
+            "Tenant's USDT token account (source of funds)"
+          ],
+          "writable": true
+        },
+        {
+          "name": "treasury_token",
+          "docs": [
+            "Treasury token account (receives 5% fee)"
+          ],
+          "writable": true
+        },
+        {
+          "name": "treasury",
+          "docs": [
+            "Treasury state account"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "miner"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "session_id",
+          "type": {
+            "array": [
+              "u8",
+              16
+            ]
+          }
+        },
+        {
+          "name": "expected_hours",
+          "type": "u16"
+        },
+        {
+          "name": "hourly_price",
+          "type": "u64"
+        },
+        {
+          "name": "node_id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "deposit_fee",
+      "docs": [
+        "Reserved for future automated buyback."
+      ],
+      "discriminator": [
+        11,
+        51,
+        105,
+        140,
+        198,
+        229,
+        7,
+        77
+      ],
+      "accounts": [
+        {
+          "name": "treasury",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "dev_warp_escrow",
+      "docs": [
+        "DEV ONLY: Backdate escrow timestamps for testing settlement.",
+        "Remove before mainnet deployment."
+      ],
+      "discriminator": [
+        137,
+        99,
+        66,
+        132,
+        115,
+        235,
+        136,
+        115
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true
+        },
+        {
+          "name": "escrow",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "hours_back",
+          "type": "i64"
+        }
+      ]
+    },
+    {
+      "name": "dispute",
+      "docs": [
+        "Dispute: tenant reports miner offline. Refund unsettled escrow, slash buffer."
+      ],
+      "discriminator": [
+        216,
+        92,
+        128,
+        146,
+        202,
+        85,
+        135,
+        73
+      ],
+      "accounts": [
+        {
+          "name": "tenant",
+          "signer": true
+        },
+        {
+          "name": "escrow",
+          "writable": true
+        },
+        {
+          "name": "escrow_token",
+          "writable": true
+        },
+        {
+          "name": "tenant_token",
+          "writable": true
+        },
+        {
+          "name": "miner_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  105,
+                  110,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "escrow.miner",
+                "account": "EscrowAccount"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "init_treasury",
+      "docs": [
+        "Initialize protocol treasury (once)."
+      ],
+      "discriminator": [
+        105,
+        152,
+        173,
+        51,
+        158,
+        151,
+        49,
+        14
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "treasury",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "reclaim",
+      "docs": [
+        "Reclaim: session expired. Return unsettled escrow to tenant. Permissionless."
+      ],
+      "discriminator": [
+        44,
+        177,
+        236,
+        249,
+        145,
+        109,
+        163,
+        186
+      ],
+      "accounts": [
+        {
+          "name": "caller",
+          "signer": true
+        },
+        {
+          "name": "escrow",
+          "writable": true
+        },
+        {
+          "name": "escrow_token",
+          "writable": true
+        },
+        {
+          "name": "tenant_token",
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "register_miner",
+      "docs": [
+        "Register miner node on-chain with hardware fingerprint."
+      ],
+      "discriminator": [
+        101,
+        185,
+        46,
+        223,
+        72,
+        27,
+        180,
+        14
+      ],
+      "accounts": [
+        {
+          "name": "miner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "miner_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  105,
+                  110,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "miner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "node_id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "fingerprint_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "buffer_cap",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "settle_hour",
+      "docs": [
+        "Settle one hour: miner claims escrow_amount/expected_hours.",
+        "Idempotent via bitmap. 10% → security buffer, rest → miner wallet."
+      ],
+      "discriminator": [
+        150,
+        190,
+        130,
+        169,
+        39,
+        215,
+        160,
+        133
+      ],
+      "accounts": [
+        {
+          "name": "miner_signer",
+          "signer": true
+        },
+        {
+          "name": "escrow",
+          "writable": true
+        },
+        {
+          "name": "escrow_token",
+          "writable": true
+        },
+        {
+          "name": "miner_token",
+          "writable": true
+        },
+        {
+          "name": "miner_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  105,
+                  110,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "miner_signer"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "hour_index",
+          "type": "u16"
+        }
+      ]
+    },
+    {
+      "name": "slash_miner",
+      "docs": [
+        "Slash miner buffer on violation (authority only)."
+      ],
+      "discriminator": [
+        172,
+        78,
+        219,
+        55,
+        54,
+        231,
+        130,
+        236
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "docs": [
+            "Only treasury authority can slash"
+          ],
+          "signer": true
+        },
+        {
+          "name": "treasury",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "miner_account",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "slash_amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "unregister_miner",
+      "docs": [
+        "Voluntary unregister — starts 7-day cooldown."
+      ],
+      "discriminator": [
+        42,
+        5,
+        100,
+        59,
+        213,
+        158,
+        213,
+        84
+      ],
+      "accounts": [
+        {
+          "name": "miner",
+          "signer": true
+        },
+        {
+          "name": "miner_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  105,
+                  110,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "miner"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "withdraw_buffer",
+      "docs": [
+        "Withdraw security buffer after 7-day cooldown."
+      ],
+      "discriminator": [
+        90,
+        131,
+        164,
+        164,
+        84,
+        162,
+        127,
+        172
+      ],
+      "accounts": [
+        {
+          "name": "miner",
+          "signer": true
+        },
+        {
+          "name": "miner_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  105,
+                  110,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "miner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "buffer_token",
+          "writable": true
+        },
+        {
+          "name": "miner_token",
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": []
+    }
+  ],
+  "accounts": [
+    {
+      "name": "EscrowAccount",
+      "discriminator": [
+        36,
+        69,
+        48,
+        18,
+        128,
+        225,
+        125,
+        135
+      ]
+    },
+    {
+      "name": "MinerAccount",
+      "discriminator": [
+        232,
+        196,
+        79,
+        139,
+        222,
+        213,
+        161,
+        99
+      ]
+    },
+    {
+      "name": "TreasuryAccount",
+      "discriminator": [
+        204,
+        140,
+        18,
+        173,
+        90,
+        152,
+        134,
+        123
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "BufferWithdrawn",
+      "discriminator": [
+        75,
+        118,
+        177,
+        214,
+        183,
+        17,
+        158,
+        228
+      ]
+    },
+    {
+      "name": "EscrowCreated",
+      "discriminator": [
+        70,
+        127,
+        105,
+        102,
+        92,
+        97,
+        7,
+        173
+      ]
+    },
+    {
+      "name": "HourSettled",
+      "discriminator": [
+        185,
+        160,
+        81,
+        107,
+        236,
+        30,
+        8,
+        149
+      ]
+    },
+    {
+      "name": "MinerRegistered",
+      "discriminator": [
+        40,
+        91,
+        92,
+        195,
+        9,
+        137,
+        86,
+        194
+      ]
+    },
+    {
+      "name": "MinerSlashed",
+      "discriminator": [
+        134,
+        90,
+        17,
+        35,
+        50,
+        63,
+        181,
+        89
+      ]
+    },
+    {
+      "name": "MinerUnregistered",
+      "discriminator": [
+        162,
+        136,
+        174,
+        232,
+        174,
+        98,
+        181,
+        37
+      ]
+    },
+    {
+      "name": "SessionDisputed",
+      "discriminator": [
+        94,
+        224,
+        174,
+        133,
+        185,
+        44,
+        163,
+        229
+      ]
+    },
+    {
+      "name": "SessionReclaimed",
+      "discriminator": [
+        19,
+        188,
+        249,
+        118,
+        22,
+        226,
+        186,
+        67
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "SessionNotActive",
+      "msg": "Session is not in ACTIVE phase"
+    },
+    {
+      "code": 6001,
+      "name": "HourAlreadySettled",
+      "msg": "This hour has already been settled"
+    },
+    {
+      "code": 6002,
+      "name": "AllHoursSettled",
+      "msg": "All hours have been settled"
+    },
+    {
+      "code": 6003,
+      "name": "SettlementTooEarly",
+      "msg": "Not enough time has elapsed for this settlement"
+    },
+    {
+      "code": 6004,
+      "name": "SessionNotExpired",
+      "msg": "Session has not expired yet"
+    },
+    {
+      "code": 6005,
+      "name": "DisputeAlreadyFiled",
+      "msg": "Dispute already filed for this session"
+    },
+    {
+      "code": 6006,
+      "name": "InvalidEscrowAmount",
+      "msg": "Invalid escrow amount"
+    },
+    {
+      "code": 6007,
+      "name": "InvalidExpectedHours",
+      "msg": "Expected hours must be between 1 and 256"
+    },
+    {
+      "code": 6008,
+      "name": "UnauthorizedTenant",
+      "msg": "Unauthorized: only tenant can perform this action"
+    },
+    {
+      "code": 6009,
+      "name": "UnauthorizedMiner",
+      "msg": "Unauthorized: only miner can perform this action"
+    },
+    {
+      "code": 6010,
+      "name": "UnauthorizedAuthority",
+      "msg": "Unauthorized: only treasury authority"
+    },
+    {
+      "code": 6011,
+      "name": "MinerAlreadyRegistered",
+      "msg": "Miner already registered"
+    },
+    {
+      "code": 6012,
+      "name": "MinerNotFound",
+      "msg": "Miner not found"
+    },
+    {
+      "code": 6013,
+      "name": "NodeHasActiveSession",
+      "msg": "Cannot unregister: node has active session"
+    },
+    {
+      "code": 6014,
+      "name": "CooldownNotPassed",
+      "msg": "Buffer withdrawal: cooldown not yet passed"
+    },
+    {
+      "code": 6015,
+      "name": "NoBufferToWithdraw",
+      "msg": "Buffer withdrawal: no buffer to withdraw"
+    },
+    {
+      "code": 6016,
+      "name": "InvalidMinerStatus",
+      "msg": "Miner status does not allow this action"
+    },
+    {
+      "code": 6017,
+      "name": "Overflow",
+      "msg": "Arithmetic overflow"
+    }
+  ],
+  "types": [
+    {
+      "name": "BufferWithdrawn",
+      "docs": [
+        "Emitted when a miner withdraws their security buffer."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "EscrowAccount",
+      "docs": [
+        "Escrow account — holds locked USDT for a rental session.",
+        "PDA seeds: [\"escrow\", session_id]"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "session_id",
+            "docs": [
+              "Unique session identifier"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          },
+          {
+            "name": "tenant",
+            "docs": [
+              "Tenant who locked the escrow"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "miner",
+            "docs": [
+              "Miner who receives settlement"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "node_id",
+            "docs": [
+              "Node being rented"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "escrow_amount",
+            "docs": [
+              "Total USDT locked (in base units, 6 decimals)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "platform_fee",
+            "docs": [
+              "Platform fee (5%) already deducted and sent to treasury"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "hourly_price",
+            "docs": [
+              "Hourly price in base units"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "expected_hours",
+            "docs": [
+              "Expected rental hours"
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "hours_settled",
+            "docs": [
+              "Hours already settled (unlocked to miner)"
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "settled_bitmap",
+            "docs": [
+              "Bitmap of settled hours (max 256 hours = 32 bytes). Bit N = hour N settled."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "phase",
+            "docs": [
+              "Session phase"
+            ],
+            "type": {
+              "defined": {
+                "name": "EscrowPhase"
+              }
+            }
+          },
+          {
+            "name": "started_at",
+            "docs": [
+              "Timestamps (Unix epoch seconds)"
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "expires_at",
+            "type": "i64"
+          },
+          {
+            "name": "completed_at",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "docs": [
+              "Escrow PDA bump"
+            ],
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "EscrowCreated",
+      "docs": [
+        "Emitted when a new escrow is created."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "session_id",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          },
+          {
+            "name": "tenant",
+            "type": "pubkey"
+          },
+          {
+            "name": "miner",
+            "type": "pubkey"
+          },
+          {
+            "name": "escrow_amount",
+            "type": "u64"
+          },
+          {
+            "name": "platform_fee",
+            "type": "u64"
+          },
+          {
+            "name": "expected_hours",
+            "type": "u16"
+          },
+          {
+            "name": "expires_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "EscrowPhase",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Active"
+          },
+          {
+            "name": "Disputed"
+          },
+          {
+            "name": "Completed"
+          }
+        ]
+      }
+    },
+    {
+      "name": "HourSettled",
+      "docs": [
+        "Emitted when one hour is settled."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "session_id",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          },
+          {
+            "name": "miner",
+            "type": "pubkey"
+          },
+          {
+            "name": "hour_index",
+            "type": "u16"
+          },
+          {
+            "name": "to_miner",
+            "type": "u64"
+          },
+          {
+            "name": "to_buffer",
+            "type": "u64"
+          },
+          {
+            "name": "total_settled",
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MinerAccount",
+      "docs": [
+        "Miner registration account — one per miner wallet.",
+        "PDA seeds: [\"miner\", wallet_address]"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "wallet",
+            "docs": [
+              "Miner's Solana wallet"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "node_id",
+            "docs": [
+              "Assigned node ID (set by Control Plane)"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "fingerprint_hash",
+            "docs": [
+              "Hardware fingerprint hash (SHA256 from NeuroClient)"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "security_buffer",
+            "docs": [
+              "Security Buffer: staked USDT for slashing on disputes"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "buffer_cap",
+            "docs": [
+              "Buffer cap: 100 * hourly_price (in base units)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "opt_in_buffer_routing",
+            "docs": [
+              "Whether miner opts in to route extra profits to buffer"
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "buffer_locked_since",
+            "docs": [
+              "When buffer was first locked (Unix epoch)"
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "registered_at",
+            "docs": [
+              "Registration timestamp"
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "unregistered_at",
+            "docs": [
+              "Unregistration timestamp (0 if still active)"
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "status",
+            "docs": [
+              "Status"
+            ],
+            "type": {
+              "defined": {
+                "name": "MinerStatus"
+              }
+            }
+          },
+          {
+            "name": "bump",
+            "docs": [
+              "PDA bump"
+            ],
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MinerRegistered",
+      "docs": [
+        "Emitted when a miner registers on-chain."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "node_id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "buffer_cap",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MinerSlashed",
+      "docs": [
+        "Emitted when a miner's buffer is slashed."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "slash_amount",
+            "type": "u64"
+          },
+          {
+            "name": "remaining_buffer",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MinerStatus",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Active"
+          },
+          {
+            "name": "Cooldown"
+          },
+          {
+            "name": "Violated"
+          },
+          {
+            "name": "Withdrawn"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MinerUnregistered",
+      "docs": [
+        "Emitted when a miner starts unregistration cooldown."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "cooldown_until",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SessionDisputed",
+      "docs": [
+        "Emitted when a tenant disputes a session."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "session_id",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          },
+          {
+            "name": "tenant",
+            "type": "pubkey"
+          },
+          {
+            "name": "refund_amount",
+            "type": "u64"
+          },
+          {
+            "name": "slash_amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SessionReclaimed",
+      "docs": [
+        "Emitted when an expired session is reclaimed."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "session_id",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          },
+          {
+            "name": "refund_amount",
+            "type": "u64"
+          },
+          {
+            "name": "hours_settled",
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TreasuryAccount",
+      "docs": [
+        "Protocol treasury account — receives 5% platform fee from every deployment.",
+        "PDA seeds: [\"treasury\"]"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "docs": [
+              "Authority that can execute buybacks (multisig or admin)"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "total_fees_collected",
+            "docs": [
+              "Total USDT accumulated from platform fees"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "total_buyback_spent",
+            "docs": [
+              "Total USDT spent on $NRG buybacks"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "sessions_count",
+            "docs": [
+              "Number of escrow sessions that contributed fees"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "docs": [
+              "PDA bump"
+            ],
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ]
+}

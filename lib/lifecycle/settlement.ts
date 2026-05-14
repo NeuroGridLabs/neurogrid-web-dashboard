@@ -1,18 +1,24 @@
 /**
  * Streaming Settlement & Reclamation.
- * Hourly epochs: every 1h verified uptime, unlock HourlyPrice * 0.95 from Escrow.
+ * Hourly epochs: every 1h verified uptime, unlock escrow_usd / expected_hours from Escrow.
  * Kill switch: at expires_at with no renewal -> RECLAIMING, drop tunnel, DESTROY_CONTAINER.
  * Disputes: if offline, refund only unused time to tenant, slash Miner SecurityBuffer.
  */
 
 import type { RentalSession, RentalPhase } from "@/lib/types/escrow"
-import { MINER_ORDER_SHARE } from "@/lib/types/escrow"
 
 /**
- * Per-hour amount unlocked from escrow to miner (95% of hourly price).
+ * Per-hour amount unlocked from escrow to miner.
+ * Pool-based: escrow_usd / expected_hours (not a fixed 95% constant).
  */
-export function hourlyUnlockAmountUsd(hourlyPriceUsd: number): number {
-  return hourlyPriceUsd * MINER_ORDER_SHARE
+export function hourlyUnlockAmountUsd(escrowUsd: number, expectedHours: number): number {
+  if (!Number.isFinite(escrowUsd) || !Number.isFinite(expectedHours)) {
+    throw new Error("escrowUsd and expectedHours must be finite numbers")
+  }
+  if (escrowUsd < 0 || expectedHours <= 0) {
+    throw new Error("escrowUsd must be non-negative, expectedHours must be positive")
+  }
+  return escrowUsd / expectedHours
 }
 
 /**
@@ -20,7 +26,7 @@ export function hourlyUnlockAmountUsd(hourlyPriceUsd: number): number {
  * Returns the amount to credit to miner for this epoch.
  */
 export function settleOneHour(session: RentalSession): number {
-  return hourlyUnlockAmountUsd(session.hourly_price_usd)
+  return hourlyUnlockAmountUsd(session.escrow_total_usd, session.expected_hours)
 }
 
 /**
@@ -45,10 +51,13 @@ export function disputeRefundAndSlash(
   session: RentalSession,
   hoursUsed: number
 ): { refund_tenant_usd: number; slash_miner_usd: number } {
+  if (!Number.isFinite(hoursUsed) || hoursUsed < 0) {
+    throw new Error("hoursUsed must be a non-negative finite number")
+  }
   const hoursPaid = session.expected_hours
   const unusedHours = Math.max(0, hoursPaid - hoursUsed)
   const refundTenantUsd = unusedHours * session.hourly_price_usd
-  // Slash: protocol can define amount (e.g. proportional to dispute or fixed). Here we use 1 hour worth from buffer.
+  // Slash: 1 hour worth from buffer
   const slashMinerUsd = session.hourly_price_usd
   return { refund_tenant_usd: refundTenantUsd, slash_miner_usd: slashMinerUsd }
 }

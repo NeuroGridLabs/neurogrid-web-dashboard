@@ -81,9 +81,9 @@ export function ProtocolStats() {
   // Epoch 0 (Genesis): real or placeholder values, no mock jitter
   const pFloorDisplay = treasury?.pFloor ?? 0
   const epochProgressUsd = treasury?.totalReserveUsd ?? 0
-  const totalRepurchased = 0 // $NRG locked from 5% fee
-  const activeGpus = 2
-  const genesisNodes = 1
+  const totalRepurchased = 0 // MOCK:Epoch0 — $NRG locked from 5% fee; wire to settlement_logs aggregate
+  const activeGpus = 2 // MOCK:Epoch0 — wire to /api/nodes count where status=active
+  const genesisNodes = 1 // MOCK:Epoch0 — wire to /api/nodes count where is_genesis=true
 
   return (
     <section className="px-4 py-10">
@@ -110,14 +110,14 @@ export function ProtocolStats() {
           />
           <StatCard
             label="Epoch 1 Progress"
-            value={loading ? "—" : `$${Math.round(epochProgressUsd).toLocaleString()} / $10,000`}
+            value={loading ? "—" : `$${Math.round(epochProgressUsd).toLocaleString("en-US")} / $10,000`}
             sub="Target threshold for first hard-asset rebalance."
             icon={<Droplets className="h-4 w-4" />}
             accentColor="#00FF41"
           />
           <StatCard
             label="Total Repurchased"
-            value={totalRepurchased.toLocaleString()}
+            value={totalRepurchased.toLocaleString("en-US")}
             sub="$NRG locked from 5% protocol fee."
             icon={<Flame className="h-4 w-4" />}
             accentColor="#00FF41"

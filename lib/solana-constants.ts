@@ -14,8 +14,12 @@ export const TREASURY_WALLET_ADDRESS = new PublicKey(TREASURY_WALLET_ADDRESS_STR
 export const ADMIN_WALLET_ADDRESS =
   process.env.NEXT_PUBLIC_ADMIN_WALLET ?? "8KRqwem4WFs1JtTK7oQSDvEKqB8e1DkqygSLbb9StBva"
 
-/** Solana Mainnet USDT mint — 95/5 SPL token split (miner 95%, treasury 5%). */
-const USDT_MINT_ADDRESS_STR = "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"
+/**
+ * USDT mint used by the protocol — 95/5 SPL token split (miner 95%, treasury 5%).
+ * Env-driven so devnet can use a test mint; falls back to mainnet USDT.
+ */
+const USDT_MINT_ADDRESS_STR =
+  process.env.NEXT_PUBLIC_USDT_MINT ?? "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"
 
 export const USDT_MINT_ADDRESS = new PublicKey(USDT_MINT_ADDRESS_STR)
 
