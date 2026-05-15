@@ -3,8 +3,9 @@ import { Connection, Keypair, PublicKey, Transaction, VersionedTransaction } fro
 import type { Neurogrid } from "./neurogrid"
 import idl from "./neurogrid.idl.json"
 
+// `||` not `??` — Vercel env pull writes Sensitive vars as "" which is not nullish.
 const RPC_URL =
-  process.env.NEXT_PUBLIC_SOLANA_RPC ?? "https://api.devnet.solana.com"
+  process.env.NEXT_PUBLIC_SOLANA_RPC || "https://api.devnet.solana.com"
 
 const connection = new Connection(RPC_URL, "confirmed")
 

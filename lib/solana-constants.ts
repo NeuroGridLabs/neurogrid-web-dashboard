@@ -1,8 +1,11 @@
 import { PublicKey } from "@solana/web3.js"
 
+// Use `||` not `??` for env fallbacks: Vercel `env pull` writes Sensitive vars as "" (empty string),
+// which is not nullish, so `??` would pass "" to `new PublicKey()` and throw "Invalid public key input".
+
 /** NeuroGrid Multi-sig Treasury Vault (Solana). Receives 5% protocol fee on every Deploy. */
 const TREASURY_WALLET_ADDRESS_STR =
-  process.env.NEXT_PUBLIC_TREASURY_WALLET ?? "AmKdMDFTYRXUHPxcXjvJxMM1xZeAmR6rmeNj2t2cWH3h"
+  process.env.NEXT_PUBLIC_TREASURY_WALLET || "AmKdMDFTYRXUHPxcXjvJxMM1xZeAmR6rmeNj2t2cWH3h"
 
 export const TREASURY_WALLET_ADDRESS = new PublicKey(TREASURY_WALLET_ADDRESS_STR)
 
@@ -12,14 +15,14 @@ export const TREASURY_WALLET_ADDRESS = new PublicKey(TREASURY_WALLET_ADDRESS_STR
  * When this wallet connects on the Miner page, "Genesis Command Center" view is shown.
  */
 export const ADMIN_WALLET_ADDRESS =
-  process.env.NEXT_PUBLIC_ADMIN_WALLET ?? "8KRqwem4WFs1JtTK7oQSDvEKqB8e1DkqygSLbb9StBva"
+  process.env.NEXT_PUBLIC_ADMIN_WALLET || "8KRqwem4WFs1JtTK7oQSDvEKqB8e1DkqygSLbb9StBva"
 
 /**
  * USDT mint used by the protocol — 95/5 SPL token split (miner 95%, treasury 5%).
  * Env-driven so devnet can use a test mint; falls back to mainnet USDT.
  */
 const USDT_MINT_ADDRESS_STR =
-  process.env.NEXT_PUBLIC_USDT_MINT ?? "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"
+  process.env.NEXT_PUBLIC_USDT_MINT || "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"
 
 export const USDT_MINT_ADDRESS = new PublicKey(USDT_MINT_ADDRESS_STR)
 
